@@ -102,3 +102,16 @@ describe("progress never goes backwards", () => {
     }
   });
 });
+
+describe("job description progress", () => {
+  it("describes reading a job description", () => {
+    let p = startProgress(0);
+    expect(label("jd", p)).toBe("Sending the job description…");
+    p = applyEvent(p, { type: "phase", phase: "analyzing" }, 0);
+    expect(label("jd", p)).toBe("Reading the job description…");
+    p = applyEvent(p, { type: "progress", chars: 500, count: 0, stage: "details" }, 0);
+    expect(label("jd", p)).toBe("Extracting the role and requirements…");
+    p = applyEvent(p, { type: "progress", chars: 2_000, count: 0, stage: "keywords" }, 0);
+    expect(label("jd", p)).toBe("Picking out ATS keywords…");
+  });
+});

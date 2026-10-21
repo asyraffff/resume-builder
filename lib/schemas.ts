@@ -116,6 +116,9 @@ export const JobDescription = z.object({
 });
 export type JobDescription = z.infer<typeof JobDescription>;
 
+/** Result of /api/parse-jd: the job plus excerpts of any text in it aimed at AI tools. */
+export type ParseJdResult = { jd: JobDescription; warnings: string[] };
+
 // ---------- Match report ----------
 
 export const MetricHint = z.object({

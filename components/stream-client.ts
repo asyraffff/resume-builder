@@ -4,6 +4,16 @@ import { applyEvent, startProgress, type Progress, type Stats, type StreamEvent,
 
 const statsKey = (task: Task) => `resume-tailor-${task}-stats`;
 
+/** A request rejected before streaming started; `data` is the server's JSON body. */
+export class StreamRequestError extends Error {
+  constructor(
+    message: string,
+    public data: Record<string, unknown>,
+  ) {
+    super(message);
+  }
+}
+
 export function loadStats(task: Task): Stats {
   try {
     const s = JSON.parse(localStorage.getItem(statsKey(task)) ?? "null");
@@ -54,7 +64,7 @@ export async function runStream<D>(task: Task, url: string, init: RequestInit, o
   // Validation errors come back as plain JSON before any streaming starts.
   if (!res.ok || !res.body) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(data.error ?? "Request failed.");
+    throw new StreamRequestError(data.error ?? "Request failed.", data);
   }
   for await (const e of readEvents<D>(res)) {
     if (e.type === "error") throw new Error(e.message);

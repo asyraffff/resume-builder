@@ -1,12 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Button, ErrorNote, Spinner, postForm } from "./ui";
+import { Button, ErrorNote } from "./ui";
 import type { JobDescription } from "@/lib/schemas";
+import type { Progress } from "@/lib/stream-progress";
+import type { ParseJdResult } from "@/lib/schemas";
 import { ScreenshotInput, imagesFrom } from "./ScreenshotInput";
+import { StreamRequestError, runStream } from "./stream-client";
+import { TaskProgressBar } from "./TaskProgressBar";
 
 type Mode = "text" | "url" | "image";
-type JdResponse = { jd?: JobDescription; warnings?: string[]; fallback?: boolean; reason?: string };
 
 export function JdInput({
   onParsed,
@@ -21,7 +24,8 @@ export function JdInput({
   const [text, setText] = useState("");
   const [url, setUrl] = useState("");
   const [images, setImages] = useState<File[]>([]);
-  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<Progress | null>(null);
+  const busy = progress !== null;
   const [error, setError] = useState<string | null>(null);
   const [fallbackMsg, setFallbackMsg] = useState<string | null>(null);
 
@@ -30,24 +34,24 @@ export function JdInput({
 
   async function submit() {
     setError(null);
-    setBusy(true);
     try {
       const fd = new FormData();
       fd.append("mode", mode);
       if (mode === "text") fd.append("text", text);
       if (mode === "url") fd.append("url", url);
       if (mode === "image") images.forEach((f) => fd.append("image", f));
-      const data = await postForm<JdResponse>("/api/parse-jd", fd);
-      if (data.fallback) {
-        setFallbackMsg(`${data.reason} Paste the job description text or upload a screenshot instead.`);
+      const data = await runStream<ParseJdResult>("jd", "/api/parse-jd", { body: fd }, setProgress);
+      onParsed(data.jd, data.warnings);
+    } catch (e) {
+      // Links that need a sign-in (LinkedIn) can't be read: switch to pasting or a screenshot.
+      if (e instanceof StreamRequestError && e.data.fallback) {
+        setFallbackMsg(`${e.data.reason} Paste the job description text or upload a screenshot instead.`);
         setMode("text");
         return;
       }
-      if (data.jd) onParsed(data.jd, data.warnings ?? []);
-    } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't read the job description.");
     } finally {
-      setBusy(false);
+      setProgress(null);
     }
   }
 
@@ -122,9 +126,15 @@ export function JdInput({
 
       {error && <div className="mt-3"><ErrorNote>{error}</ErrorNote></div>}
 
-      <Button className="mt-4 w-full" onClick={submit} disabled={!canSubmit}>
-        {busy ? <><Spinner /> Reading job description…</> : submitLabel}
-      </Button>
+      {progress ? (
+        <div className="mt-4 rounded-lg bg-accent-soft/50 p-3">
+          <TaskProgressBar task="jd" progress={progress} />
+        </div>
+      ) : (
+        <Button className="mt-4 w-full" onClick={submit} disabled={!canSubmit}>
+          {submitLabel}
+        </Button>
+      )}
       {mode === "text" && text.trim().length > 0 && text.trim().length < 100 && (
         <p className="mt-2 text-xs text-muted">Paste a bit more: at least a few sentences.</p>
       )}

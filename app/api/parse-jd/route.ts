@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import type Anthropic from "@anthropic-ai/sdk";
-import { callStructured } from "@/lib/claude";
+import { AiError, callStructuredStream } from "@/lib/claude";
 import { PARSE_JD_SYSTEM } from "@/lib/prompts";
-import { JobDescription } from "@/lib/schemas";
+import { JobDescription, type ParseJdResult } from "@/lib/schemas";
 import { fetchJobDescription } from "@/lib/fetch-jd";
 import { screenJobDescription } from "@/lib/screen-jd";
 import { badRequest, errorResponse } from "@/lib/api-error";
+import { ndjsonStream } from "@/lib/stream-response";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -14,12 +15,17 @@ const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"] as co
 type ImageType = (typeof IMAGE_TYPES)[number];
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
+/**
+ * Reads a job description from pasted text, a link or screenshots. Input problems (and links that can't be read)
+ * are answered with plain JSON before streaming starts; then progress events stream, followed by the result.
+ */
 export async function POST(req: Request) {
+  let content: Anthropic.Beta.Messages.BetaContentBlockParam[];
+  let rawText = "";
+
   try {
     const form = await req.formData();
     const mode = String(form.get("mode") ?? "");
-    let content: Anthropic.Beta.Messages.BetaContentBlockParam[];
-    let rawText = "";
 
     if (mode === "text") {
       rawText = String(form.get("text") ?? "").trim();
@@ -28,8 +34,8 @@ export async function POST(req: Request) {
     } else if (mode === "url") {
       const result = await fetchJobDescription(String(form.get("url") ?? ""));
       if (!result.ok) {
-        // 200 with fallback flag: this is an expected outcome, not an error.
-        return NextResponse.json({ fallback: true, reason: result.reason });
+        // Expected for LinkedIn and other sign-in pages: the UI switches to paste/screenshot.
+        return NextResponse.json({ fallback: true, reason: result.reason, error: result.reason }, { status: 422 });
       }
       rawText = result.text;
       content = [{ type: "text", text: `Text scraped from a job page:\n<page>\n${rawText}\n</page>` }];
@@ -50,14 +56,19 @@ export async function POST(req: Request) {
     } else {
       return badRequest("Unknown input mode.");
     }
-
-    const parsed = await callStructured({ schema: JobDescription, system: PARSE_JD_SYSTEM, content, effort: "low" });
-    const { jd, warnings } = screenJobDescription(parsed, rawText);
-    if (!jd.title && jd.requiredSkills.length === 0 && jd.responsibilities.length === 0) {
-      return badRequest("That doesn't look like a job description. " + jd.summary);
-    }
-    return NextResponse.json({ jd, warnings });
   } catch (err) {
     return errorResponse(err);
   }
+
+  return ndjsonStream<ParseJdResult>(
+    async (onProgress) => {
+      const parsed = await callStructuredStream({ schema: JobDescription, system: PARSE_JD_SYSTEM, content, effort: "low" }, onProgress);
+      const { jd, warnings } = screenJobDescription(parsed, rawText);
+      if (!jd.title && jd.requiredSkills.length === 0 && jd.responsibilities.length === 0) {
+        throw new AiError(`That doesn't look like a job description. ${jd.summary}`.trim(), 400);
+      }
+      return { jd, warnings };
+    },
+    (text) => ({ count: 0, stage: /"keywords"\s*:/.test(text) ? "keywords" : "details" }),
+  );
 }

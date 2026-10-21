@@ -1,6 +1,6 @@
 /** Shared progress model for long AI tasks that stream their output (resume upload and job matching). */
 
-export type Task = "parse" | "match";
+export type Task = "parse" | "jd" | "match";
 
 /** Events streamed by long-running API routes, one JSON object per line. */
 export type StreamEvent<D> =
@@ -26,11 +26,13 @@ export type Stats = { durations: number[]; chars: number[] };
 /** Starting estimates until this browser has its own history. Measured on typical runs. */
 export const DEFAULTS: Record<Task, { duration: number; chars: number }> = {
   parse: { duration: 35_000, chars: 9_000 },
+  jd: { duration: 12_000, chars: 2_500 },
   match: { duration: 90_000, chars: 16_000 },
 };
 
 export const STEPS: Record<Task, [string, string, string]> = {
   parse: ["Upload", "Read", "Extract & check"],
+  jd: ["Send", "Read", "Extract"],
   match: ["Send", "Analyze", "Write"],
 };
 
@@ -107,6 +109,11 @@ export function label(task: Task, p: Progress): string {
     if (p.phase === "analyzing") return "Reading your resume…";
     if (p.stage === "ats") return "Running the ATS check…";
     return p.count > 0 ? `Extracting sections: ${p.count} ${p.count === 1 ? "entry" : "entries"} found…` : "Extracting sections…";
+  }
+  if (task === "jd") {
+    if (p.phase === "sending") return "Sending the job description…";
+    if (p.phase === "analyzing") return "Reading the job description…";
+    return p.stage === "keywords" ? "Picking out ATS keywords…" : "Extracting the role and requirements…";
   }
   if (p.phase === "sending") return "Sending your resume and the job description…";
   if (p.phase === "analyzing") return "Analyzing your experience against the job…";
