@@ -14,11 +14,15 @@ import { downloadBlob, exportFileName } from "@/lib/export/shared";
 import { placeholdersInResume } from "@/lib/placeholders";
 import { runAtsChecks } from "@/lib/ats-checks";
 import { AtsLiveCheck } from "@/components/AtsLiveCheck";
+import { CompareView } from "@/components/CompareView";
+import { compareResumes } from "@/lib/diff";
 
 export default function EditorPage() {
   const router = useRouter();
   const hydrated = useHydrated();
-  const { resume, jd, report, suggestionStatus, activeJobId, past, future, undo, redo, resetToOriginal } = useResumeStore();
+  const { resume, original, jd, report, suggestionStatus, activeJobId, past, future, undo, redo, resetToOriginal } = useResumeStore();
+  const [view, setView] = useState<"edit" | "compare">("edit");
+  const changeCount = useMemo(() => (resume && original ? compareResumes(original, resume).total : 0), [resume, original]);
   const match = useMatchRunner();
   const [exporting, setExporting] = useState<"pdf" | "docx" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -159,13 +163,39 @@ export default function EditorPage() {
 
         <section className="min-w-0">
           {error && <div className="mb-4"><ErrorNote>{error}</ErrorNote></div>}
-          <p className="mb-3 text-xs text-muted">
-            {jd ? <>Tailoring for <span className="font-medium text-foreground">{jd.title}{jd.company ? ` at ${jd.company}` : ""}</span>. Changes save automatically. </> : "Changes save automatically. "}
-            Click any text to edit. Drag the ⋮⋮ handles to reorder sections, entries and bullets. Press Enter for a new bullet.
-          </p>
-          <div className="pl-7">
-            <ResumeEditor highlight={highlight} />
+          <div className="mb-3 flex flex-wrap items-center gap-3">
+            <div className="flex gap-1 rounded-lg bg-surface p-1 ring-1 ring-border" role="tablist" aria-label="View">
+              {(
+                [
+                  ["edit", "Edit"],
+                  ["compare", `Compare with original${changeCount ? ` (${changeCount})` : ""}`],
+                ] as const
+              ).map(([v, label]) => (
+                <button
+                  key={v}
+                  role="tab"
+                  aria-selected={view === v}
+                  onClick={() => setView(v)}
+                  className={`rounded-md px-3 py-1 text-sm font-medium ${view === v ? "bg-accent-soft text-accent" : "text-muted hover:text-foreground"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
+          <p className="mb-3 text-xs text-muted">
+            {view === "compare" ? "What changed between your uploaded resume and this version. Switch back to Edit to make changes. " : null}
+            {view === "edit" &&
+              (jd ? <>Tailoring for <span className="font-medium text-foreground">{jd.title}{jd.company ? ` at ${jd.company}` : ""}</span>. Changes save automatically. </> : "Changes save automatically. ")}
+            {view === "edit" && "Click any text to edit. Drag the ⋮⋮ handles to reorder sections, entries and bullets. Press Enter for a new bullet."}
+          </p>
+          {view === "compare" && original ? (
+            <CompareView original={original} tailored={resume} />
+          ) : (
+            <div className="pl-7">
+              <ResumeEditor highlight={highlight} />
+            </div>
+          )}
         </section>
       </main>
       <StepNav step={3} />
