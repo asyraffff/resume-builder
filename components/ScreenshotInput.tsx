@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 const ACCEPTED = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 const MAX_IMAGES = 5;
@@ -9,6 +9,8 @@ const MAX_BYTES = 5 * 1024 * 1024;
 export function isMac() {
   return typeof navigator !== "undefined" && /Mac|iPhone|iPad/i.test(navigator.userAgent);
 }
+
+const noSubscribe = () => () => {};
 
 /** Pulls image files out of a paste or drop. */
 export function imagesFrom(data: DataTransfer | null): File[] {
@@ -20,13 +22,16 @@ export function ScreenshotInput({ images, onChange }: { images: File[]; onChange
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const mac = useMemo(isMac, []);
+  // The platform never changes; the server snapshot (false) keeps the first render identical to the server's.
+  const mac = useSyncExternalStore(noSubscribe, isMac, () => false);
   const pasteKey = mac ? "⌘V" : "Ctrl+V";
   const snipKey = mac ? "⌃⇧⌘4" : "Win+Shift+S";
 
   // Keep the latest images for the window-level paste handler without re-subscribing on every change.
   const imagesRef = useRef(images);
-  imagesRef.current = images;
+  useEffect(() => {
+    imagesRef.current = images;
+  }, [images]);
 
   function add(files: File[]) {
     setNotice(null);

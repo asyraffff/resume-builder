@@ -25,16 +25,13 @@ export function ResumeEditor({ highlight }: { highlight?: Set<string> }) {
   const [focusId, setFocusId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ label: string; after: Resume } | null>(null);
 
-  // The toast's Undo is only safe while the deletion is the latest change; hide it after any other edit or a few seconds.
+  // The toast's Undo is only safe while the deletion is the latest change, so it disappears after any other edit.
+  const visibleToast = toast && toast.after === resume ? toast : null;
   useEffect(() => {
     if (!toast) return;
-    if (resume !== toast.after) {
-      setToast(null);
-      return;
-    }
     const t = setTimeout(() => setToast(null), 6000);
     return () => clearTimeout(t);
-  }, [toast, resume]);
+  }, [toast]);
 
   if (!resume) return null;
 
@@ -234,12 +231,12 @@ export function ResumeEditor({ highlight }: { highlight?: Set<string> }) {
 
       <AddSection onAdd={(type) => set((r) => ({ ...r, sections: [...r.sections, { id: newId(), type, title: DEFAULT_TITLES[type], hidden: false, items: [emptyItem()] }] }))} />
 
-      {toast && (
+      {visibleToast && (
         <div
           role="status"
           className="fixed bottom-5 left-1/2 z-30 flex -translate-x-1/2 items-center gap-4 rounded-lg bg-neutral-900 px-4 py-2.5 text-sm text-white shadow-lg"
         >
-          <span>{toast.label}</span>
+          <span>{visibleToast.label}</span>
           <button
             className="font-semibold text-blue-300 hover:text-blue-200"
             onClick={() => {

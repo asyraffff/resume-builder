@@ -52,10 +52,20 @@ export function startProgress(now: number): Progress {
   return { startedAt: now, phase: "sending", phaseStartedAt: now, chars: 0, count: 0, stage: "" };
 }
 
+const PHASE_ORDER = { sending: 0, analyzing: 1, writing: 2 } as const;
+
+/** Phases only move forward and the written size only grows, so percent() never goes backwards. */
 export function applyEvent<D>(p: Progress, e: StreamEvent<D>, now: number): Progress {
-  if (e.type === "phase" && e.phase !== p.phase) return { ...p, phase: e.phase, phaseStartedAt: now };
+  if (e.type === "phase" && PHASE_ORDER[e.phase] > PHASE_ORDER[p.phase]) return { ...p, phase: e.phase, phaseStartedAt: now };
   if (e.type === "progress") {
-    return { ...p, phase: "writing", phaseStartedAt: p.phase === "writing" ? p.phaseStartedAt : now, chars: e.chars, count: e.count, stage: e.stage };
+    return {
+      ...p,
+      phase: "writing",
+      phaseStartedAt: p.phase === "writing" ? p.phaseStartedAt : now,
+      chars: Math.max(p.chars, e.chars),
+      count: Math.max(p.count, e.count),
+      stage: e.stage,
+    };
   }
   return p;
 }
@@ -63,11 +73,12 @@ export function applyEvent<D>(p: Progress, e: StreamEvent<D>, now: number): Prog
 /**
  * Percent complete. While Claude is reasoning there is nothing to measure, so that phase eases toward 45%
  * over time without reaching it. Once it starts writing, progress follows the actual output size.
- * Never reports 100% before the result arrives. Callers keep the highest value shown so the bar never moves backwards.
+ * Never reports 100% before the result arrives. With applyEvent's guarantees the value never decreases over time.
  */
 export function percent(p: Progress, now: number, exp: { duration: number; chars: number }): number {
   let value: number;
-  const inPhase = now - p.phaseStartedAt;
+  // The caller's clock ticks every 500ms, so it can lag just behind a phase change.
+  const inPhase = Math.max(0, now - p.phaseStartedAt);
   if (p.phase === "sending") {
     value = Math.min(5, 2 + inPhase / 1000);
   } else if (p.phase === "analyzing") {

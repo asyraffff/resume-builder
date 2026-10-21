@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { STEPS, expected, formatDuration, label, percent, remaining, remainingText, type Progress, type Task } from "@/lib/stream-progress";
 import { loadStats } from "./stream-client";
 
@@ -8,15 +8,13 @@ import { loadStats } from "./stream-client";
 export function TaskProgressBar({ task, progress, className = "" }: { task: Task; progress: Progress; className?: string }) {
   const [now, setNow] = useState(() => Date.now());
   const exp = useMemo(() => expected(task, loadStats(task)), [task]);
-  const maxShown = useRef(0);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 500);
     return () => clearInterval(t);
   }, []);
 
-  const pct = Math.max(maxShown.current, percent(progress, now, exp));
-  maxShown.current = pct;
+  const pct = percent(progress, now, exp);
   const left = remainingText(remaining(progress, now, exp));
   const stepIndex = { sending: 0, analyzing: 1, writing: 2 }[progress.phase];
 

@@ -70,3 +70,35 @@ describe("stream progress", () => {
     expect(label("parse", p)).toBe("Running the ATS check…");
   });
 });
+
+describe("progress never goes backwards", () => {
+  it("ignores late phase events and shrinking sizes", () => {
+    let p = applyEvent(startProgress(0), { type: "progress", chars: 5_000, count: 3, stage: "suggestions" }, 10_000);
+    p = applyEvent(p, { type: "phase", phase: "analyzing" }, 11_000);
+    expect(p.phase).toBe("writing");
+    p = applyEvent(p, { type: "progress", chars: 4_000, count: 2, stage: "suggestions" }, 12_000);
+    expect(p.chars).toBe(5_000);
+    expect(p.count).toBe(3);
+  });
+
+  it("is non-decreasing across a whole run", () => {
+    const e = { duration: 60_000, chars: 10_000 };
+    let p = startProgress(0);
+    let last = 0;
+    const steps: [number, Parameters<typeof applyEvent>[1] | null][] = [
+      [1_000, null],
+      [2_000, { type: "phase", phase: "analyzing" }],
+      [20_000, null],
+      [60_000, null],
+      [61_000, { type: "progress", chars: 100, count: 0, stage: "summary" }],
+      [70_000, { type: "progress", chars: 6_000, count: 4, stage: "suggestions" }],
+      [80_000, { type: "progress", chars: 12_000, count: 9, stage: "suggestions" }],
+    ];
+    for (const [t, ev] of steps) {
+      if (ev) p = applyEvent(p, ev, t);
+      const v = percent(p, t, e);
+      expect(v).toBeGreaterThanOrEqual(last);
+      last = v;
+    }
+  });
+});

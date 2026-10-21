@@ -25,11 +25,22 @@ Everything revolves around one structured `Resume` JSON (`lib/schemas.ts`):
 
 1. **`/api/parse-resume`**: a PDF is sent to Claude as a document; a DOCX is converted to text with `mammoth`. Claude extracts the `Resume` and an ATS review. Deterministic checks in `lib/ats-checks.ts` are merged in.
 2. **`/api/parse-jd`**: pasted text, screenshots (Claude vision), or a URL (`lib/fetch-jd.ts`: JSON-LD and known containers via `cheerio`, with private hosts blocked on every redirect hop). If a page needs a login, as LinkedIn often does, the UI falls back to paste or screenshot.
-3. **`/api/match`** (streams progress as newline-delimited JSON, see `lib/match-progress.ts`): Claude compares the resume and the JD and returns a score, keyword gaps, and suggestions as patches that reference section, item, and bullet ids. The prompt forbids inventing experience. Anything that adds an unverified claim is flagged `needsUserConfirmation`, and "Accept all safe" skips it.
+3. **`/api/match`**: Claude compares the resume and the JD and returns a score, keyword gaps, and suggestions as patches that reference section, item, and bullet ids. The prompt forbids inventing experience. Anything that adds an unverified claim is flagged `needsUserConfirmation`, and "Accept all safe" skips it.
 4. **Jobs and editor**: each job (`store/resume-store.ts`) keeps its own tailored resume, match report and accepted suggestions. The active job's data lives at the top level of the store, so the editor and suggestions panel don't need to know about jobs. Suggestions are applied by `lib/apply-suggestion.ts`. Inline editing and three-level drag and drop use `@dnd-kit` (sections, entries, bullets). Undo/redo is supported per job. Everything persists to localStorage; saved data from older versions of the app is migrated automatically.
 5. **Export**: `lib/export/pdf.tsx` (`@react-pdf/renderer`, selectable text) and `lib/export/docx.ts` (`docx`) share one single-column, ATS-safe layout.
 
+Uploading and matching stream their progress as newline-delimited JSON (`lib/stream-response.ts` on the server, `lib/stream-progress.ts` for the shared progress model), which drives the progress bars.
+
 All Claude calls go through `lib/claude.ts` (`claude-opus-5-5`, structured outputs via Zod, server-side refusal fallback, stop-reason checks).
+
+## Known audit findings
+
+`npm audit` still lists two issues that don't affect the running app and have no fixed version upstream:
+
+- `braces` (via `eslint-config-next`): used only by the ESLint tooling on a developer machine, never in the website.
+- `sprintf-js` (via `mammoth` → `argparse`): used only by mammoth's command-line tool (`bin/mammoth`), which the app never runs.
+
+`npm audit fix --force` would "fix" these by downgrading to very old major versions, so don't run it.
 
 ## Not in the MVP yet
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { create } from "zustand";
 import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
 import type { AtsReport, JobDescription, MatchReport, Resume } from "@/lib/schemas";
@@ -518,11 +518,9 @@ export function migrateV2(old: Partial<State>): Partial<State> {
 
 /** True once persisted state has loaded. False during SSR and the first client render, which avoids hydration mismatches. */
 export function useHydrated() {
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    const unsub = useResumeStore.persist.onFinishHydration(() => setHydrated(true));
-    if (useResumeStore.persist.hasHydrated()) setHydrated(true);
-    return unsub;
-  }, []);
-  return hydrated;
+  return useSyncExternalStore(
+    (onChange) => useResumeStore.persist.onFinishHydration(onChange),
+    () => useResumeStore.persist.hasHydrated(),
+    () => false,
+  );
 }
