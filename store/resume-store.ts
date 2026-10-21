@@ -4,7 +4,7 @@ import { useSyncExternalStore } from "react";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type { AtsReport, JobDescription, MatchReport, Resume } from "@/lib/schemas";
-import { applySuggestion, reorderSections } from "@/lib/apply-suggestion";
+import { applySuggestion, isStale, reorderSections } from "@/lib/apply-suggestion";
 import { newId } from "@/lib/ids";
 import { hasPlaceholders } from "@/lib/placeholders";
 import { safeStorage } from "./storage";
@@ -306,7 +306,7 @@ export const useResumeStore = create<StoreState>()(
           const status = { ...suggestionStatus };
           let count = 0;
           for (const s of report.suggestions) {
-            if (status[s.id] || s.needsUserConfirmation || hasPlaceholders(s.proposed)) continue;
+            if (status[s.id] || s.needsUserConfirmation || hasPlaceholders(s.proposed) || isStale(current, s)) continue;
             const next = applySuggestion(current, s);
             if (next) {
               current = next;

@@ -67,3 +67,35 @@ export function reorderSections(resume: Resume, order: string[]): Resume {
   const rest = resume.sections.filter((s) => !order.includes(s.id));
   return { ...resume, sections: [...listed, ...rest] };
 }
+
+/**
+ * The resume text a suggestion replaces or removes, as it is now, or null for suggestions that only add
+ * something (new bullets, skills) or whose target no longer exists.
+ */
+export function currentTextFor(resume: Resume, s: Suggestion): string | null {
+  if (s.target === "summary") return resume.summary;
+  const section = resume.sections.find((sec) => sec.id === s.sectionId);
+  if (!section) return null;
+  if (s.target === "section") return s.kind === "rewrite" ? section.title : null;
+  if (s.target === "bullet" && (s.kind === "rewrite" || s.kind === "remove")) {
+    const item = section.items.find((it) => it.id === s.itemId);
+    return item?.bullets.find((b) => b.id === s.bulletId)?.text ?? null;
+  }
+  return null;
+}
+
+/** True when the text a suggestion was based on has been edited since, so accepting it would overwrite that edit. */
+export function isStale(resume: Resume, s: Suggestion): boolean {
+  const current = currentTextFor(resume, s);
+  // Ignore case, spacing and punctuation: older reports hold the AI's copy of the text, which can differ slightly.
+  const squash = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+  return current !== null && squash(current) !== squash(s.original);
+}
+
+/** Sets each suggestion's `original` to the exact text it targets in the resume the match was based on. */
+export function pinOriginals(resume: Resume, suggestions: Suggestion[]): Suggestion[] {
+  return suggestions.map((s) => {
+    const current = currentTextFor(resume, s);
+    return current === null ? s : { ...s, original: current };
+  });
+}

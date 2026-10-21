@@ -18,11 +18,17 @@ const KIND_LABEL: Record<string, string> = {
 export function SuggestionCard({
   s,
   context,
+  stale = false,
+  current = null,
   onAccept,
   onReject,
 }: {
   s: Suggestion;
   context: string;
+  /** The text this suggestion targets was edited after the suggestion was made. */
+  stale?: boolean;
+  /** The targeted text as it is now. */
+  current?: string | null;
   onAccept: (override?: string) => void;
   onReject: () => void;
 }) {
@@ -40,8 +46,18 @@ export function SuggestionCard({
         <span className="truncate text-muted">{context}</span>
       </div>
 
-      {s.original && (
-        <p className={`mt-2 text-sm ${s.kind === "remove" ? "text-bad line-through" : "text-muted line-through decoration-neutral-400"}`}>{s.original}</p>
+      {stale && current !== null ? (
+        <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs">
+          <p className="font-medium text-warn">You&apos;ve edited this since the suggestion was made.</p>
+          <p className="mt-1 text-muted">
+            Now: <span className="text-foreground">{current || "(empty)"}</span>
+          </p>
+          <p className="mt-1 text-muted">Accepting will replace your current text.</p>
+        </div>
+      ) : (
+        s.original && (
+          <p className={`mt-2 text-sm ${s.kind === "remove" ? "text-bad line-through" : "text-muted line-through decoration-neutral-400"}`}>{s.original}</p>
+        )
       )}
       {s.kind !== "remove" &&
         (editing ? (
@@ -85,7 +101,7 @@ export function SuggestionCard({
           title={open.length > 0 ? "Fill in the numbers first" : undefined}
           onClick={() => onAccept(changed || editing ? draft : undefined)}
         >
-          {editing ? "Save & apply" : "Accept"}
+          {editing ? "Save & apply" : stale ? (s.kind === "remove" ? "Remove anyway" : "Replace anyway") : "Accept"}
         </Button>
         {s.kind !== "remove" && !editing && (
           <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>Edit</Button>

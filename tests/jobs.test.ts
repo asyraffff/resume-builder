@@ -161,7 +161,7 @@ describe("accept all safe", () => {
     store().setReportFor(a, {
       ...report(50),
       suggestions: [
-        sug({ id: "ok", target: "summary", proposed: "Clean summary" }),
+        sug({ id: "ok", target: "summary", original: "Engineer.", proposed: "Clean summary" }),
         sug({ id: "ph", sectionId: "exp", itemId: "job1", bulletId: "b1", proposed: "Cut runtime by [% reduction in runtime]" }),
       ],
     });
@@ -248,5 +248,21 @@ describe("last edited", () => {
     expect(selectWorkspaces(store()).find((w) => w.id === first)!.updatedAt).toBe(before);
     store().updateResume((r) => ({ ...r, summary: "edit" }));
     expect(selectWorkspaces(store()).find((w) => w.id === first)!.updatedAt).toBeGreaterThan(before);
+  });
+});
+
+describe("accept all safe and later edits", () => {
+  it("skips suggestions whose target was edited after the match", () => {
+    const a = store().addJob(jd("Frontend"), "original");
+    store().setReportFor(a, {
+      ...report(50),
+      suggestions: [sug({ id: "r1", sectionId: "exp", itemId: "job1", bulletId: "b1", original: "Built things", proposed: "Built React apps" })],
+    });
+    store().updateResume((r) => ({
+      ...r,
+      sections: r.sections.map((s) => (s.id === "exp" ? { ...s, items: s.items.map((it) => ({ ...it, bullets: it.bullets.map((b) => (b.id === "b1" ? { ...b, text: "My own wording" } : b)) })) } : s)),
+    }));
+    expect(store().acceptAllSafe()).toBe(0);
+    expect(store().resume?.sections[0].items[0].bullets[0].text).toBe("My own wording");
   });
 });

@@ -4,6 +4,7 @@ import { MATCH_SYSTEM } from "@/lib/prompts";
 import { JobDescription, MatchReport, Resume } from "@/lib/schemas";
 import { badRequest } from "@/lib/api-error";
 import { ndjsonStream } from "@/lib/stream-response";
+import { pinOriginals } from "@/lib/apply-suggestion";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -38,6 +39,8 @@ export async function POST(req: Request) {
       );
       // Drop suggestions that reference ids that don't exist, so the UI never applies a broken patch.
       report.suggestions = report.suggestions.filter((s) => s.target === "summary" || sectionIds.has(s.sectionId));
+      // Record the exact text each suggestion was based on, so the app can tell if the user edits it before accepting.
+      report.suggestions = pinOriginals(visible, report.suggestions);
       report.suggestedSectionOrder = report.suggestedSectionOrder.filter((id) => sectionIds.has(id));
       return report;
     },

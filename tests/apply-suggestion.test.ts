@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applySuggestion, reorderSections } from "@/lib/apply-suggestion";
+import { applySuggestion, currentTextFor, isStale, pinOriginals, reorderSections } from "@/lib/apply-suggestion";
 import { sampleResume, sug } from "./fixtures";
 
 describe("applySuggestion", () => {
@@ -56,5 +56,37 @@ describe("reorderSections", () => {
   it("reorders and keeps unlisted sections at the end", () => {
     const r = reorderSections(sampleResume(), ["skills"]);
     expect(r.sections.map((s) => s.id)).toEqual(["skills", "exp"]);
+  });
+});
+
+describe("suggestions made before later edits", () => {
+  it("pins each suggestion to the exact text it targets", () => {
+    const [s] = pinOriginals(sampleResume(), [sug({ sectionId: "exp", itemId: "job1", bulletId: "b1", original: "built things (AI copy)" })]);
+    expect(s.original).toBe("Built things");
+  });
+
+  it("flags a suggestion as stale once its target text is edited", () => {
+    const s = pinOriginals(sampleResume(), [sug({ sectionId: "exp", itemId: "job1", bulletId: "b1", proposed: "Built React apps" })])[0];
+    const r = sampleResume();
+    expect(isStale(r, s)).toBe(false);
+    r.sections[0].items[0].bullets[0].text = "Built a payments service";
+    expect(isStale(r, s)).toBe(true);
+    expect(currentTextFor(r, s)).toBe("Built a payments service");
+  });
+
+  it("ignores case, spacing and punctuation differences", () => {
+    const s = sug({ sectionId: "exp", itemId: "job1", bulletId: "b1", original: "built things." });
+    expect(isStale(sampleResume(), s)).toBe(false);
+  });
+
+  it("never flags suggestions that only add something", () => {
+    expect(isStale(sampleResume(), sug({ kind: "add", sectionId: "exp", itemId: "job1", original: "anything" }))).toBe(false);
+    expect(isStale(sampleResume(), sug({ kind: "add", target: "skills", sectionId: "skills", original: "x" }))).toBe(false);
+  });
+
+  it("covers summary and section titles", () => {
+    expect(isStale(sampleResume(), sug({ target: "summary", original: "Engineer." }))).toBe(false);
+    expect(isStale(sampleResume(), sug({ target: "summary", original: "Something else" }))).toBe(true);
+    expect(isStale(sampleResume(), sug({ target: "section", sectionId: "exp", original: "Work history" }))).toBe(true);
   });
 });

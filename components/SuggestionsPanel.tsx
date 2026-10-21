@@ -7,6 +7,7 @@ import { hasPlaceholders } from "@/lib/placeholders";
 import { Badge, Button, ScoreRing } from "./ui";
 import { SuggestionCard } from "./SuggestionCard";
 import { liveScore } from "@/lib/keywords";
+import { currentTextFor, isStale } from "@/lib/apply-suggestion";
 
 function contextLabel(r: Resume, s: Suggestion) {
   if (s.target === "summary") return "Summary";
@@ -29,7 +30,8 @@ export function SuggestionsPanel() {
   const aiNotes = new Map(report.missingKeywords.map((k) => [k.keyword.toLowerCase(), k]));
   const pending = report.suggestions.filter((s) => !suggestionStatus[s.id]);
   const done = report.suggestions.filter((s) => suggestionStatus[s.id]);
-  const safeCount = pending.filter((s) => !s.needsUserConfirmation && !hasPlaceholders(s.proposed)).length;
+  const staleIds = new Set(pending.filter((s) => isStale(resume, s)).map((s) => s.id));
+  const safeCount = pending.filter((s) => !s.needsUserConfirmation && !hasPlaceholders(s.proposed) && !staleIds.has(s.id)).length;
   const orderChanged = report.suggestedSectionOrder.join() !== resume.sections.filter((s) => report.suggestedSectionOrder.includes(s.id)).map((s) => s.id).join();
 
   const note = (msg: string) => {
@@ -108,12 +110,20 @@ export function SuggestionsPanel() {
 
       <div>
         <h3 className="text-sm font-medium">Suggestions ({pending.length} to review)</h3>
+        {staleIds.size > 0 && (
+          <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-warn">
+            {staleIds.size} suggestion{staleIds.size > 1 ? "s were" : " was"} made before your latest edits. They&apos;re marked below and
+            aren&apos;t included in &ldquo;Accept all safe&rdquo;, so your edits won&apos;t be overwritten by accident.
+          </p>
+        )}
         <div className="mt-2 space-y-3">
           {pending.map((s) => (
             <SuggestionCard
               key={s.id}
               s={s}
               context={contextLabel(resume, s)}
+              stale={staleIds.has(s.id)}
+              current={currentTextFor(resume, s)}
               onAccept={(override) => {
                 if (!acceptSuggestion(s.id, override)) note("That part of the resume has changed, so this suggestion can't be applied.");
               }}
