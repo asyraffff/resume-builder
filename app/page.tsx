@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, Button, ErrorNote, Header, StepNav } from "@/components/ui";
 import { TaskProgressBar } from "@/components/TaskProgressBar";
+import { BackupControls } from "@/components/BackupControls";
 import { runStream } from "@/components/stream-client";
 import type { Progress } from "@/lib/stream-progress";
 import { selectWorkspaces, useHydrated, useResumeStore, type Workspace } from "@/store/resume-store";
@@ -106,6 +107,14 @@ export default function UploadPage() {
         </div>
 
         {error && <div className="mt-4"><ErrorNote>{error}</ErrorNote></div>}
+
+        {/* One instance in a fixed place, so its status message survives the list appearing or disappearing. */}
+        {hydrated && !busy && (
+          <div className="mt-4 flex flex-wrap items-start justify-end gap-2 text-sm text-muted">
+            {workspaces.length === 0 && <span className="pt-1.5">Have a backup file?</span>}
+            <BackupControls compact />
+          </div>
+        )}
 
         {hydrated && workspaces.length > 0 && (
           <section aria-label="Your resumes" className="mt-8">

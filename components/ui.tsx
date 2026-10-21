@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
-import { useHydrated, useResumeStore } from "@/store/resume-store";
+import { useHydrated, useResumeStore, useSaveFailed } from "@/store/resume-store";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 
@@ -113,6 +113,7 @@ export function Header({ step, right }: { step: Step; right?: ReactNode }) {
   // Later steps need a resume; before hydration we can't know, so keep them disabled to avoid a flash.
   const enabled = (i: number) => i === 0 || (hydrated && hasResume);
 
+  const saveFailed = useSaveFailed();
   return (
     <header className="sticky top-0 z-20 border-b border-border bg-surface/90 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-7xl items-center gap-3 px-4 sm:gap-5">
@@ -147,6 +148,12 @@ export function Header({ step, right }: { step: Step; right?: ReactNode }) {
         </nav>
         <div className="ml-auto flex shrink-0 items-center gap-2">{right}</div>
       </div>
+      {saveFailed && (
+        <div role="alert" className="border-t border-red-200 bg-red-50 px-4 py-2 text-center text-sm text-bad">
+          Your latest changes couldn&apos;t be saved because this browser&apos;s storage is full. Back up your resumes from the Upload page,
+          then delete ones you no longer need.
+        </div>
+      )}
     </header>
   );
 }

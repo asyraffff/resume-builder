@@ -33,6 +33,10 @@ Uploading and matching stream their progress as newline-delimited JSON (`lib/str
 
 All Claude calls go through `lib/claude.ts` (`claude-opus-5-5`, structured outputs via Zod, server-side refusal fallback, stop-reason checks).
 
+## Your data
+
+Everything is stored in this browser (localStorage, about 5 MB). Use **Back up all** on the Upload page to download every resume, job and tailored version as one JSON file, and **Restore from backup** to load it again, e.g. in another browser. The format is versioned (`lib/backup.ts`) so older backups keep importing. If storage fills up, a banner warns that changes aren't being saved.
+
 ## Known audit findings
 
 `npm audit` still lists two issues that don't affect the running app and have no fixed version upstream:

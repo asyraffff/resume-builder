@@ -69,6 +69,8 @@ type Actions = {
   setParsed: (resume: Resume, ats: AtsReport, fileName: string) => void;
   switchWorkspace: (id: string) => void;
   deleteWorkspace: (id: string) => void;
+  /** Adds resumes from a backup. A resume that already exists (same id) is replaced by the backup copy. */
+  importWorkspaces: (incoming: Workspace[]) => void;
   /** Adds a job and makes it active. Its resume starts from the uploaded resume or a copy of the one on screen. */
   addJob: (jd: JobDescription, startFrom: StartFrom) => string;
   switchJob: (id: string) => void;
@@ -90,6 +92,28 @@ type Actions = {
 
 const HISTORY_LIMIT = 50;
 
+const STORAGE_EVENT = "resume-tailor-storage";
+let saveFailed = false;
+
+function setSaveFailed(failed: boolean) {
+  if (failed === saveFailed) return;
+  saveFailed = failed;
+  // No window during server rendering or tests.
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(STORAGE_EVENT));
+}
+
+/** True while the latest save to browser storage failed (usually because storage is full). */
+export function useSaveFailed() {
+  return useSyncExternalStore(
+    (onChange) => {
+      window.addEventListener(STORAGE_EVENT, onChange);
+      return () => window.removeEventListener(STORAGE_EVENT, onChange);
+    },
+    () => saveFailed,
+    () => false,
+  );
+}
+
 // localStorage can be unavailable (private mode, blocked storage) — never let that break the app.
 const safeStorage: StateStorage = {
   getItem: (k) => {
@@ -102,8 +126,10 @@ const safeStorage: StateStorage = {
   setItem: (k, v) => {
     try {
       localStorage.setItem(k, v);
+      setSaveFailed(false);
     } catch {
-      /* quota or blocked */
+      // Usually the browser's storage quota. Tell the UI so the user isn't silently losing work.
+      setSaveFailed(true);
     }
   },
   removeItem: (k) => {
@@ -271,6 +297,19 @@ export const useResumeStore = create<StoreState>()(
           if (!w) return;
           set({ workspaces });
           loadWorkspace(w);
+        },
+
+        importWorkspaces: (incoming) => {
+          const s = get();
+          const current = snapshotWorkspaces(s);
+          const byId = new Map(incoming.map((w) => [w.id, w]));
+          const merged = [...current.map((w) => byId.get(w.id) ?? w), ...incoming.filter((w) => !current.some((c) => c.id === w.id))];
+          set({ workspaces: merged });
+          // Open the backup's copy if it replaced the resume on screen, or the newest import if nothing was open.
+          const replacedOpen = s.activeWorkspaceId ? byId.get(s.activeWorkspaceId) : undefined;
+          const newest = [...incoming].sort((a, b) => b.updatedAt - a.updatedAt)[0];
+          if (replacedOpen) loadWorkspace(replacedOpen);
+          else if (!s.activeWorkspaceId && newest) loadWorkspace(newest);
         },
 
         deleteWorkspace: (id) => {
