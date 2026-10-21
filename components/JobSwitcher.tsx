@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { selectJobs, useResumeStore } from "@/store/resume-store";
+import { liveScore } from "@/lib/keywords";
 
 /** Picks which job's tailored resume is on screen. */
 export function JobSwitcher() {
@@ -40,7 +41,7 @@ export function JobSwitcher() {
           {jobs.map((j) => (
             <option key={j.id} value={j.id}>
               {j.label}
-              {j.report ? ` · match ${Math.round(j.report.score)}` : ""}
+              {j.report ? ` · match ${liveScore(j.report, j.resume, j.jd).score}` : ""}
             </option>
           ))}
         </select>

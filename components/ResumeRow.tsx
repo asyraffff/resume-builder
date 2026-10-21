@@ -2,6 +2,7 @@
 
 import { Badge, Button } from "./ui";
 import type { Workspace } from "@/store/resume-store";
+import { liveScore } from "@/lib/keywords";
 
 /** One saved resume on the Upload page, with Continue and Delete. */
 export function ResumeRow({
@@ -18,7 +19,7 @@ export function ResumeRow({
   onDelete: () => void;
 }) {
   const scored = w.jobs.filter((j) => j.report);
-  const best = scored.length ? Math.max(...scored.map((j) => j.report!.score)) : null;
+  const best = scored.length ? Math.max(...scored.map((j) => liveScore(j.report!, j.resume, j.jd).score)) : null;
   const details = [
     w.original.contact.name,
     w.ats ? `ATS ${Math.round(w.ats.score)}` : "",

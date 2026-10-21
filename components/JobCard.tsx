@@ -5,6 +5,7 @@ import { TaskProgressBar } from "./TaskProgressBar";
 import { Badge, Button, Card, ErrorNote, ScoreRing, Spinner } from "./ui";
 import type { Progress } from "@/lib/stream-progress";
 import { jobLabel, type Job } from "@/store/resume-store";
+import { liveScore } from "@/lib/keywords";
 
 /** One job on the Job descriptions page: details, match score or live progress, and actions. */
 export function JobCard({
@@ -97,7 +98,7 @@ export function JobCard({
               Matching
             </div>
           ) : job.report ? (
-            <ScoreRing score={job.report.score} label="Match" size={64} />
+            <ScoreRing score={liveScore(job.report, job.resume, job.jd).score} label="Match" size={64} />
           ) : (
             <p className="pt-3 text-xs text-muted">Not matched yet</p>
           )}

@@ -6,6 +6,7 @@ import type { Resume, Suggestion } from "@/lib/schemas";
 import { hasPlaceholders } from "@/lib/placeholders";
 import { Badge, Button, ScoreRing } from "./ui";
 import { SuggestionCard } from "./SuggestionCard";
+import { liveScore } from "@/lib/keywords";
 
 function contextLabel(r: Resume, s: Suggestion) {
   if (s.target === "summary") return "Summary";
@@ -15,14 +16,17 @@ function contextLabel(r: Resume, s: Suggestion) {
 }
 
 export function SuggestionsPanel() {
-  const { resume, report, suggestionStatus, acceptSuggestion, rejectSuggestion, acceptAllSafe, applySuggestedOrder } = useResumeStore();
+  const { resume, jd, report, suggestionStatus, acceptSuggestion, rejectSuggestion, acceptAllSafe, applySuggestedOrder } = useResumeStore();
   const [showDone, setShowDone] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
 
-  if (!resume || !report) {
+  if (!resume || !report || !jd) {
     return <p className="text-sm text-muted">No match yet for this job. Run the match below to get a score and suggestions.</p>;
   }
 
+  const live = liveScore(report, resume, jd);
+  // The AI's notes on missing keywords, used to say which ones the resume can honestly add.
+  const aiNotes = new Map(report.missingKeywords.map((k) => [k.keyword.toLowerCase(), k]));
   const pending = report.suggestions.filter((s) => !suggestionStatus[s.id]);
   const done = report.suggestions.filter((s) => suggestionStatus[s.id]);
   const safeCount = pending.filter((s) => !s.needsUserConfirmation && !hasPlaceholders(s.proposed)).length;
@@ -36,16 +40,16 @@ export function SuggestionsPanel() {
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-4">
-        <ScoreRing score={report.score} label="Job match" size={76} />
+        <ScoreRing score={live.score} label="Job match" size={76} />
         <div className="grid flex-1 gap-1.5 text-xs">
           {(
             [
-              ["Keywords", report.breakdown.keywordCoverage],
-              ["Experience", report.breakdown.experienceRelevance],
-              ["Seniority", report.breakdown.seniorityFit],
+              ["Keywords", live.keywords, "Share of the job's keywords found in your resume. Updates as you edit."],
+              ["Experience", live.experience, "How relevant your experience is, judged by the AI at the last match."],
+              ["Seniority", live.seniority, "How well your level fits the role, judged by the AI at the last match."],
             ] as const
-          ).map(([label, v]) => (
-            <div key={label} className="flex items-center gap-2">
+          ).map(([label, v, help]) => (
+            <div key={label} className="flex items-center gap-2" title={help}>
               <span className="w-20 text-muted">{label}</span>
               <div className="h-1.5 flex-1 rounded-full bg-background">
                 <div className="h-1.5 rounded-full bg-accent" style={{ width: `${Math.max(0, Math.min(100, v))}%` }} />
@@ -55,30 +59,37 @@ export function SuggestionsPanel() {
           ))}
         </div>
       </div>
+      <p className="text-xs text-muted">
+        Keywords update live as you edit. Experience and seniority come from the last match; re-check to refresh them.
+      </p>
       <p className="text-sm text-muted">{report.summary}</p>
 
-      {report.missingKeywords.length > 0 && (
+      {live.coverage.missing.length > 0 && (
         <div>
-          <h3 className="text-sm font-medium">Missing keywords</h3>
+          <h3 className="text-sm font-medium">Missing keywords ({live.coverage.missing.length})</h3>
           <div className="mt-2 flex flex-wrap gap-1.5">
-            {report.missingKeywords.map((k) => (
-              <span key={k.keyword} title={k.note}>
-                <Badge tone={k.truthfullyAddable ? "accent" : "neutral"}>
-                  {k.keyword}
-                  {!k.truthfullyAddable && " *"}
-                </Badge>
-              </span>
-            ))}
+            {live.coverage.missing.map((k) => {
+              const note = aiNotes.get(k.toLowerCase());
+              const addable = note?.truthfullyAddable;
+              return (
+                <span key={k} title={note?.note}>
+                  <Badge tone={addable ? "accent" : "neutral"}>
+                    {k}
+                    {addable === false && " *"}
+                  </Badge>
+                </span>
+              );
+            })}
           </div>
           <p className="mt-1.5 text-xs text-muted">Blue: your resume already supports it. * means you&apos;d need real experience to add it. Hover a keyword for details.</p>
         </div>
       )}
 
-      {report.matchedKeywords.length > 0 && (
+      {live.coverage.matched.length > 0 && (
         <details className="text-sm">
-          <summary className="cursor-pointer font-medium">Matched keywords ({report.matchedKeywords.length})</summary>
+          <summary className="cursor-pointer font-medium">Matched keywords ({live.coverage.matched.length})</summary>
           <div className="mt-2 flex flex-wrap gap-1.5">
-            {report.matchedKeywords.map((k) => <Badge key={k} tone="good">{k}</Badge>)}
+            {live.coverage.matched.map((k) => <Badge key={k} tone="good">{k}</Badge>)}
           </div>
         </details>
       )}
