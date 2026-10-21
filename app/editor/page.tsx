@@ -12,6 +12,8 @@ import { Header, StepNav } from "@/components/navigation";
 import { useHydrated, useResumeStore } from "@/store/resume-store";
 import { downloadBlob, exportFileName } from "@/lib/export/shared";
 import { placeholdersInResume } from "@/lib/placeholders";
+import { runAtsChecks } from "@/lib/ats-checks";
+import { AtsLiveCheck } from "@/components/AtsLiveCheck";
 
 export default function EditorPage() {
   const router = useRouter();
@@ -58,12 +60,16 @@ export default function EditorPage() {
 
   async function exportAs(kind: "pdf" | "docx") {
     if (!resume) return;
-    const missing = placeholdersInResume(resume);
-    if (missing.length > 0) {
-      const list = missing.slice(0, 5).map((m) => `• ${m.where}: ${m.placeholder}`).join("\n");
-      const more = missing.length > 5 ? `\n…and ${missing.length - 5} more` : "";
-      const plural = missing.length > 1 ? "s" : "";
-      if (!confirm(`Your resume still has ${missing.length} unfilled placeholder${plural}:\n\n${list}${more}\n\nExport anyway?`)) return;
+    // Warn about anything a recruiter would notice; minor issues are shown in the sidebar instead.
+    const serious = runAtsChecks(resume).filter((i) => i.severity !== "low");
+    if (serious.length > 0) {
+      const placeholders = placeholdersInResume(resume)
+        .slice(0, 5)
+        .map((m) => `   ${m.where}: ${m.placeholder}`);
+      const list = serious
+        .map((i) => (i.topic.test("placeholder") && placeholders.length ? `• ${i.title}\n${placeholders.join("\n")}` : `• ${i.title}`))
+        .join("\n");
+      if (!confirm(`Before you export, these need attention:\n\n${list}\n\nExport anyway?`)) return;
     }
     setError(null);
     setExporting(kind);
@@ -115,6 +121,9 @@ export default function EditorPage() {
             <JobSwitcher />
           </div>
           <div className="p-4">
+            <div className="mb-5">
+              <AtsLiveCheck resume={resume} />
+            </div>
             {activeJobId ? (
               <>
                 {progress ? (

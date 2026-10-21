@@ -1,4 +1,5 @@
 import type { AtsIssue, Resume } from "./schemas";
+import { placeholdersInResume } from "./placeholders";
 
 const STANDARD_HEADINGS = [
   "experience",
@@ -41,7 +42,11 @@ export function dateStyle(d: string): "month-year" | "numeric" | "year" | "other
 /** A rule finding plus a pattern that recognises the same problem in the AI's wording. */
 export type RuleIssue = AtsIssue & { topic: RegExp };
 
-export function runAtsChecks(resume: Resume, ctx: { fileType: "pdf" | "docx"; rawText?: string }): RuleIssue[] {
+/**
+ * Deterministic ATS checks. Used at upload (with the file type and raw text) and live in the editor
+ * on whatever version is on screen (no context needed).
+ */
+export function runAtsChecks(resume: Resume, ctx: { fileType?: "pdf" | "docx"; rawText?: string } = {}): RuleIssue[] {
   const issues: RuleIssue[] = [];
   const { contact } = resume;
 
@@ -132,6 +137,53 @@ export function runAtsChecks(resume: Resume, ctx: { fileType: "pdf" | "docx"; ra
         fix: "Use a single-column layout without tables or text boxes. This app's export does that for you.",
       });
     }
+  }
+
+  const placeholders = placeholdersInResume(resume);
+  if (placeholders.length > 0) {
+    issues.push({
+      severity: "high",
+      title: `${placeholders.length} unfilled placeholder${placeholders.length > 1 ? "s" : ""}`,
+      topic: /placeholder/i,
+      detail: `Text like ${placeholders[0].placeholder} is still in ${placeholders[0].where}. Recruiters will see it as-is.`,
+      fix: "Replace each [placeholder] with your real number, or reword the bullet without it.",
+    });
+  }
+
+  if (!resume.summary.trim()) {
+    issues.push({
+      severity: "low",
+      title: "No professional summary",
+      topic: /summary/i,
+      detail: "A short summary at the top is where recruiters and ATS keyword searches look first.",
+      fix: "Add 2–3 sentences on your role, experience and the skills this job asks for.",
+    });
+  }
+
+  const visible = resume.sections.filter((s) => !s.hidden);
+  const emptyBullets = visible.reduce((n, s) => n + s.items.reduce((m, it) => m + it.bullets.filter((b) => !b.text.trim()).length, 0), 0);
+  if (emptyBullets > 0) {
+    issues.push({
+      severity: "low",
+      title: `${emptyBullets} empty bullet${emptyBullets > 1 ? "s" : ""}`,
+      topic: /empty bullet/i,
+      detail: "Empty bullets are left out of the export, but they may mean something unfinished.",
+      fix: "Fill them in or delete them.",
+    });
+  }
+
+  const words = [resume.summary, ...visible.flatMap((s) => s.items.flatMap((it) => [it.heading, it.subheading, ...it.bullets.map((b) => b.text)]))]
+    .join(" ")
+    .split(/\s+/)
+    .filter(Boolean).length;
+  if (words > 900) {
+    issues.push({
+      severity: "medium",
+      title: "Probably longer than two pages",
+      topic: /(two|2)[ -]pages?|too long|length/i,
+      detail: `About ${words} words. Most recruiters expect one page early in a career and two at most later on.`,
+      fix: "Cut older or less relevant bullets, or hide sections that don't help for this job.",
+    });
   }
 
   return issues;

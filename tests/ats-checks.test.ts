@@ -67,3 +67,26 @@ describe("mergeAts", () => {
     expect(out.score).toBe(80);
   });
 });
+
+describe("live checks on an edited resume", () => {
+  it("flags unfilled placeholders, a missing summary and empty bullets", () => {
+    const r = sampleResume();
+    r.summary = "";
+    r.sections[0].items[0].bullets[0].text = "Cut runtime by [% reduction in runtime]";
+    r.sections[0].items[0].bullets.push({ id: "e", text: "  " });
+    const titles = runAtsChecks(r).map((i) => i.title);
+    expect(titles).toContain("1 unfilled placeholder");
+    expect(titles).toContain("No professional summary");
+    expect(titles).toContain("1 empty bullet");
+  });
+
+  it("warns when the resume is probably over two pages", () => {
+    const r = sampleResume();
+    r.sections[0].items[0].bullets = Array.from({ length: 40 }, (_, i) => ({ id: `b${i}`, text: "word ".repeat(25) }));
+    expect(runAtsChecks(r).find((i) => i.title.startsWith("Probably longer"))?.severity).toBe("medium");
+  });
+
+  it("works without upload context", () => {
+    expect(runAtsChecks(sampleResume())).toEqual([]);
+  });
+});
