@@ -3,20 +3,12 @@
 import { useEffect, useState } from "react";
 import { useResumeStore } from "@/store/resume-store";
 import { newId } from "@/lib/ids";
-import { SECTION_TYPES, type Item, type Resume, type Section } from "@/lib/schemas";
+import type { Item, Resume, Section } from "@/lib/schemas";
 import { InlineEditable } from "./InlineEditable";
 import { DragHandle, SortableList, SortableRow } from "./Sortable";
-
-const emptyItem = (): Item => ({ id: newId(), heading: "", subheading: "", dates: "", location: "", bullets: [{ id: newId(), text: "" }] });
-
-const DEFAULT_TITLES: Record<Section["type"], string> = {
-  experience: "Experience",
-  education: "Education",
-  skills: "Skills",
-  projects: "Projects",
-  certifications: "Certifications",
-  custom: "Additional",
-};
+import { AddSection, DEFAULT_TITLES, emptyItem } from "./AddSection";
+import { SkillsItem } from "./SkillsItem";
+import { DeleteButton, ToolButton } from "./controls";
 
 export function ResumeEditor({ highlight }: { highlight?: Set<string> }) {
   const resume = useResumeStore((s) => s.resume);
@@ -249,105 +241,5 @@ export function ResumeEditor({ highlight }: { highlight?: Set<string> }) {
         </div>
       )}
     </div>
-  );
-}
-
-function SkillsItem({
-  item,
-  highlight,
-  onChange,
-  onDelete,
-  onDeleteSkill,
-}: {
-  item: Item;
-  highlight?: Set<string>;
-  onChange: (fn: (it: Item) => Item, key?: string) => void;
-  onDelete: () => void;
-  onDeleteSkill: (bulletId: string) => void;
-}) {
-  return (
-    <div className="flex flex-wrap items-baseline gap-x-1">
-      <span className="font-semibold">
-        <InlineEditable value={item.heading} onChange={(v) => onChange((x) => ({ ...x, heading: v }), `h.${item.id}`)} placeholder="Group (optional)" />:
-      </span>
-      {item.bullets.map((b, i) => (
-        <span key={b.id} className={`group/skill inline-flex items-baseline rounded ${highlight?.has(b.id) ? "bg-green-50" : ""}`}>
-          <InlineEditable
-            value={b.text}
-            placeholder="skill"
-            onChange={(v) => onChange((x) => ({ ...x, bullets: x.bullets.map((y) => (y.id === b.id ? { ...y, text: v } : y)) }), `b.${b.id}`)}
-            onBackspaceEmpty={() => onChange((x) => ({ ...x, bullets: x.bullets.filter((y) => y.id !== b.id) }))}
-          />
-          <DeleteButton reveal="skill" size="sm" label={`Delete skill ${b.text || "empty"}`} className="self-center" onClick={() => onDeleteSkill(b.id)} />
-          {i < item.bullets.length - 1 && ","}
-        </span>
-      ))}
-      <button className="text-xs text-accent hover:underline" onClick={() => onChange((x) => ({ ...x, bullets: [...x.bullets, { id: newId(), text: "" }] }))}>
-        + skill
-      </button>
-      <DeleteButton reveal="item" label="Delete skill group" className="ml-auto self-center" onClick={onDelete} />
-    </div>
-  );
-}
-
-function AddSection({ onAdd }: { onAdd: (t: Section["type"]) => void }) {
-  return (
-    <div className="mt-8 flex flex-wrap items-center gap-2 border-t border-dashed border-border pt-4 text-xs text-muted">
-      <span>Add section:</span>
-      {SECTION_TYPES.map((t) => (
-        <button key={t} className="rounded-full border border-border px-2.5 py-1 hover:border-accent hover:text-accent" onClick={() => onAdd(t)}>
-          {DEFAULT_TITLES[t]}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function ToolButton({ danger, className = "", ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { danger?: boolean }) {
-  return (
-    <button
-      {...props}
-      className={`rounded px-1.5 py-0.5 text-xs font-normal normal-case tracking-normal ${danger ? "text-muted hover:bg-red-50 hover:text-bad" : "text-muted hover:bg-background hover:text-foreground"} ${className}`}
-    />
-  );
-}
-
-// Literal class strings so Tailwind generates them. Touch screens have no hover, so buttons stay visible there.
-const REVEAL = {
-  section: "group-hover/section:opacity-100",
-  item: "group-hover/item:opacity-100",
-  bullet: "group-hover/bullet:opacity-100",
-  skill: "group-hover/skill:opacity-100",
-  link: "group-hover/link:opacity-100",
-} as const;
-
-/** Trash button for one block: appears on hover or keyboard focus. */
-function DeleteButton({
-  label,
-  onClick,
-  reveal,
-  size = "md",
-  className = "",
-}: {
-  label: string;
-  onClick: () => void;
-  reveal: keyof typeof REVEAL;
-  size?: "sm" | "md";
-  className?: string;
-}) {
-  const box = size === "sm" ? "h-5 w-5" : "h-6 w-6";
-  const icon = size === "sm" ? 12 : 14;
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      title={label}
-      className={`inline-flex shrink-0 items-center justify-center rounded text-neutral-400 opacity-0 transition hover:bg-red-50 hover:text-bad focus-visible:opacity-100 [@media(hover:none)]:opacity-60 ${REVEAL[reveal]} ${box} ${className}`}
-    >
-      <svg width={icon} height={icon} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="M2.5 4h11M6.5 4V2.5h3V4M4 4l.7 9.5h6.6L12 4M6.75 7v4M9.25 7v4" />
-      </svg>
-    </button>
   );
 }

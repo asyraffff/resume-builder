@@ -3,7 +3,8 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AtsReportCard } from "@/components/AtsReportCard";
-import { Header, Spinner, StepNav } from "@/components/ui";
+import { Spinner } from "@/components/ui";
+import { Header, StepNav } from "@/components/navigation";
 import { useHydrated, useResumeStore } from "@/store/resume-store";
 
 export default function AtsPage() {

@@ -2,67 +2,20 @@
 
 import { useSyncExternalStore } from "react";
 import { create } from "zustand";
-import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
 import type { AtsReport, JobDescription, MatchReport, Resume } from "@/lib/schemas";
 import { applySuggestion, reorderSections } from "@/lib/apply-suggestion";
 import { newId } from "@/lib/ids";
 import { hasPlaceholders } from "@/lib/placeholders";
+import { safeStorage } from "./storage";
+import { migrateV1, migrateV2, type V1State } from "./migrations";
+import { jobLabel, type Job, type StartFrom, type State, type Workspace } from "./types";
 
-export type SuggestionStatus = "accepted" | "rejected" | "failed";
-
-/** One job the user is applying for, with its own tailored resume. */
-export type Job = {
-  id: string;
-  label: string;
-  jd: JobDescription;
-  resume: Resume;
-  report: MatchReport | null;
-  suggestionStatus: Record<string, SuggestionStatus>;
-  createdAt: number;
-  updatedAt: number;
-};
-
-export type StartFrom = "original" | "current";
-
-/** One uploaded resume with everything built from it: ATS check, jobs and tailored versions. */
-export type Workspace = {
-  id: string;
-  fileName: string;
-  original: Resume;
-  ats: AtsReport | null;
-  resume: Resume;
-  jd: JobDescription | null;
-  report: MatchReport | null;
-  suggestionStatus: Record<string, SuggestionStatus>;
-  jobs: Job[];
-  activeJobId: string | null;
-  createdAt: number;
-  updatedAt: number;
-};
-
-type State = {
-  /** The resume on screen: the active job's tailored resume, or the general draft when no job is active. */
-  resume: Resume | null;
-  /** The resume as uploaded. */
-  original: Resume | null;
-  ats: AtsReport | null;
-  fileName: string;
-  /** Active job's data, kept at the top level so the editor and suggestions don't need to know about jobs. */
-  jd: JobDescription | null;
-  report: MatchReport | null;
-  suggestionStatus: Record<string, SuggestionStatus>;
-  /** All jobs. The active job's entry may be stale; use selectJobs() for an up-to-date list. */
-  jobs: Job[];
-  activeJobId: string | null;
-  /** All saved resumes. The active one's entry may be stale; use selectWorkspaces() for an up-to-date list. */
-  workspaces: Workspace[];
-  activeWorkspaceId: string | null;
-  /** When the open resume was last changed by the user (edits, jobs, matches). Shown as "edited … ago". */
-  editedAt: number;
-  past: Resume[];
-  future: Resume[];
-  lastEditKey: string | null;
-};
+// Re-exported so the rest of the app can keep importing everything store-related from here.
+export { useSaveFailed } from "./storage";
+export { migrateV1, migrateV2 } from "./migrations";
+export { jobLabel } from "./types";
+export type { Job, StartFrom, SuggestionStatus, Workspace } from "./types";
 
 type Actions = {
   /** Saves a newly uploaded resume as its own workspace and opens it. Other resumes are kept as they are. */
@@ -91,57 +44,6 @@ type Actions = {
 };
 
 const HISTORY_LIMIT = 50;
-
-const STORAGE_EVENT = "resume-tailor-storage";
-let saveFailed = false;
-
-function setSaveFailed(failed: boolean) {
-  if (failed === saveFailed) return;
-  saveFailed = failed;
-  // No window during server rendering or tests.
-  if (typeof window !== "undefined") window.dispatchEvent(new Event(STORAGE_EVENT));
-}
-
-/** True while the latest save to browser storage failed (usually because storage is full). */
-export function useSaveFailed() {
-  return useSyncExternalStore(
-    (onChange) => {
-      window.addEventListener(STORAGE_EVENT, onChange);
-      return () => window.removeEventListener(STORAGE_EVENT, onChange);
-    },
-    () => saveFailed,
-    () => false,
-  );
-}
-
-// localStorage can be unavailable (private mode, blocked storage) — never let that break the app.
-const safeStorage: StateStorage = {
-  getItem: (k) => {
-    try {
-      return localStorage.getItem(k);
-    } catch {
-      return null;
-    }
-  },
-  setItem: (k, v) => {
-    try {
-      localStorage.setItem(k, v);
-      setSaveFailed(false);
-    } catch {
-      // Usually the browser's storage quota. Tell the UI so the user isn't silently losing work.
-      setSaveFailed(true);
-    }
-  },
-  removeItem: (k) => {
-    try {
-      localStorage.removeItem(k);
-    } catch {
-      /* ignore */
-    }
-  },
-};
-
-export const jobLabel = (jd: JobDescription | null) => [jd?.company, jd?.title].filter(Boolean).join(" – ") || "Untitled job";
 
 const emptyJobState = { jd: null, report: null, suggestionStatus: {}, past: [], future: [], lastEditKey: null };
 
@@ -463,97 +365,6 @@ export const useResumeStore = create<StoreState>()(
     },
   ),
 );
-
-type V1Version = {
-  id: string;
-  name: string;
-  savedAt: number;
-  resume: Resume;
-  jd: JobDescription | null;
-  report?: MatchReport | null;
-  suggestionStatus?: Record<string, SuggestionStatus>;
-};
-type V1State = {
-  resume: Resume | null;
-  original: Resume | null;
-  ats: AtsReport | null;
-  fileName: string;
-  jd: JobDescription | null;
-  report: MatchReport | null;
-  suggestionStatus: Record<string, SuggestionStatus>;
-  versions?: V1Version[];
-  activeVersionId?: string | null;
-};
-
-/** v1 had one job on screen plus "saved versions". v2 turns each into a job, without losing or duplicating anything. */
-export function migrateV1(old: V1State): Partial<State> {
-  const jobs: Job[] = [];
-  const now = Date.now();
-  let activeJobId: string | null = null;
-  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
-
-  if (old.jd && old.resume) {
-    activeJobId = newId();
-    jobs.push({
-      id: activeJobId,
-      label: jobLabel(old.jd),
-      jd: old.jd,
-      resume: old.resume,
-      report: old.report,
-      suggestionStatus: old.suggestionStatus ?? {},
-      createdAt: now,
-      updatedAt: now,
-    });
-  }
-  for (const v of old.versions ?? []) {
-    if (!v.jd) continue; // a version without a job has nothing to tailor against
-    if (same(v.resume, old.resume) && same(v.jd, old.jd)) continue; // identical to the job on screen
-    const sameJob = !!old.jd && v.jd.title === old.jd.title && v.jd.company === old.jd.company;
-    jobs.push({
-      id: newId(),
-      label: activeJobId ? `${v.name} (saved ${new Date(v.savedAt).toLocaleDateString()})` : v.name,
-      jd: v.jd,
-      resume: v.resume,
-      // Versions saved before reports were stored can reuse the current report when it's for the same job.
-      report: v.report ?? (sameJob ? old.report : null),
-      suggestionStatus: v.suggestionStatus ?? (sameJob ? old.suggestionStatus : {}),
-      createdAt: v.savedAt,
-      updatedAt: v.savedAt,
-    });
-  }
-  return {
-    resume: old.resume,
-    original: old.original,
-    ats: old.ats,
-    fileName: old.fileName,
-    jd: old.jd,
-    report: old.report,
-    suggestionStatus: old.suggestionStatus ?? {},
-    jobs,
-    activeJobId,
-  };
-}
-
-/** v2 had a single resume. v3 keeps several; the existing one becomes the first saved resume. */
-export function migrateV2(old: Partial<State>): Partial<State> {
-  if (!old.resume || !old.original) return { ...old, workspaces: [], activeWorkspaceId: null };
-  const now = Date.now();
-  const w: Workspace = {
-    id: newId(),
-    fileName: old.fileName ?? "",
-    original: old.original,
-    ats: old.ats ?? null,
-    resume: old.resume,
-    jd: old.jd ?? null,
-    report: old.report ?? null,
-    suggestionStatus: old.suggestionStatus ?? {},
-    jobs: old.jobs ?? [],
-    activeJobId: old.activeJobId ?? null,
-    createdAt: now,
-    updatedAt: now,
-  };
-  return { ...old, workspaces: [w], activeWorkspaceId: w.id, editedAt: now };
-}
 
 /** True once persisted state has loaded. False during SSR and the first client render, which avoids hydration mismatches. */
 export function useHydrated() {
