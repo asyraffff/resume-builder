@@ -148,15 +148,16 @@ export default function UploadPage() {
       <footer className="mt-6 border-t border-border bg-surface">
         <div className="mx-auto max-w-3xl px-4 py-10">
           <h2 className="text-sm font-medium text-muted">How it works</h2>
-          <div className="mt-4 grid gap-6 sm:grid-cols-3">
+          <div className="mt-4 grid gap-6 sm:grid-cols-2">
             {[
+              ["Upload", "Add your resume as a PDF or Word file. You can keep several resumes and switch between them."],
               ["ATS check", "Find formatting and content problems that stop applicant tracking systems from reading your resume."],
               ["Job descriptions", "Add one or more jobs by pasting the text, sharing a link, or uploading a screenshot. See your fit score for each."],
               ["Tailor & export", "Get a tailored resume per job: accept suggestions, drag sections into place, and export to PDF or Word."],
             ].map(([t, d], i) => (
               <div key={t}>
                 <p className="font-medium">
-                  <span className="mr-1.5 tabular-nums text-accent">{i + 2}.</span>
+                  <span className="mr-1.5 tabular-nums text-accent">{i + 1}.</span>
                   {t}
                 </p>
                 <p className="mt-1 text-sm text-muted">{d}</p>
