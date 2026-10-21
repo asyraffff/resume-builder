@@ -25,7 +25,7 @@ type Actions = {
   /** Adds resumes from a backup. A resume that already exists (same id) is replaced by the backup copy. */
   importWorkspaces: (incoming: Workspace[]) => void;
   /** Adds a job and makes it active. Its resume starts from the uploaded resume or a copy of the one on screen. */
-  addJob: (jd: JobDescription, startFrom: StartFrom) => string;
+  addJob: (jd: JobDescription, startFrom: StartFrom, warnings?: string[]) => string;
   switchJob: (id: string) => void;
   deleteJob: (id: string) => void;
   renameJob: (id: string, label: string) => void;
@@ -225,12 +225,12 @@ export const useResumeStore = create<StoreState>()(
           else set({ ...noResume });
         },
 
-        addJob: (jd, startFrom) => {
+        addJob: (jd, startFrom, warnings = []) => {
           const s = get();
           const base = startFrom === "current" ? s.resume : s.original;
           if (!base) return "";
           const now = Date.now();
-          const job: Job = { id: newId(), label: jobLabel(jd), jd, resume: base, report: null, suggestionStatus: {}, createdAt: now, updatedAt: now };
+          const job: Job = { id: newId(), label: jobLabel(jd), jd, resume: base, report: null, suggestionStatus: {}, warnings, createdAt: now, updatedAt: now };
           set({ jobs: [...snapshotActive(s), job], editedAt: Date.now() });
           loadJob(job);
           return job.id;

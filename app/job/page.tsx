@@ -97,8 +97,8 @@ export default function JobsPage() {
                 <JdInput
                   key={formKey}
                   submitLabel="Add job"
-                  onParsed={async (jd) => {
-                    const id = addJob(jd, startFrom);
+                  onParsed={async (jd, warnings) => {
+                    const id = addJob(jd, startFrom, warnings);
                     if (!id) return;
                     setFormKey((k) => k + 1);
                     setJustAdded(id);

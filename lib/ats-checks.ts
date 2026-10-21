@@ -1,5 +1,6 @@
 import type { AtsIssue, Resume } from "./schemas";
 import { placeholdersInResume } from "./placeholders";
+import { detectInjection } from "./injection";
 
 const STANDARD_HEADINGS = [
   "experience",
@@ -137,6 +138,18 @@ export function runAtsChecks(resume: Resume, ctx: { fileType?: "pdf" | "docx"; r
         fix: "Use a single-column layout without tables or text boxes. This app's export does that for you.",
       });
     }
+  }
+
+  const allText = [resume.summary, ...resume.sections.flatMap((s) => [s.title, ...s.items.flatMap((it) => [it.heading, it.subheading, ...it.bullets.map((b) => b.text)])])].join("\n");
+  const injected = detectInjection(allText);
+  if (injected.length > 0) {
+    issues.push({
+      severity: "high",
+      title: "Hidden instructions aimed at AI screeners",
+      topic: /(hidden|instructions?).*(ai|screener)|ai screener/i,
+      detail: `Found: "${injected[0]}". Text like this tries to manipulate automated screening.`,
+      fix: "Remove it: recruiters see it as a red flag and it can get the application rejected.",
+    });
   }
 
   const placeholders = placeholdersInResume(resume);

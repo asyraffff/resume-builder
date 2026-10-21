@@ -4,6 +4,7 @@ import { callStructured } from "@/lib/claude";
 import { PARSE_JD_SYSTEM } from "@/lib/prompts";
 import { JobDescription } from "@/lib/schemas";
 import { fetchJobDescription } from "@/lib/fetch-jd";
+import { screenJobDescription } from "@/lib/screen-jd";
 import { badRequest, errorResponse } from "@/lib/api-error";
 
 export const runtime = "nodejs";
@@ -50,11 +51,12 @@ export async function POST(req: Request) {
       return badRequest("Unknown input mode.");
     }
 
-    const jd = await callStructured({ schema: JobDescription, system: PARSE_JD_SYSTEM, content, effort: "low" });
+    const parsed = await callStructured({ schema: JobDescription, system: PARSE_JD_SYSTEM, content, effort: "low" });
+    const { jd, warnings } = screenJobDescription(parsed, rawText);
     if (!jd.title && jd.requiredSkills.length === 0 && jd.responsibilities.length === 0) {
       return badRequest("That doesn't look like a job description. " + jd.summary);
     }
-    return NextResponse.json({ jd });
+    return NextResponse.json({ jd, warnings });
   } catch (err) {
     return errorResponse(err);
   }

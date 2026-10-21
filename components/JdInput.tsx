@@ -6,14 +6,14 @@ import type { JobDescription } from "@/lib/schemas";
 import { ScreenshotInput, imagesFrom } from "./ScreenshotInput";
 
 type Mode = "text" | "url" | "image";
-type JdResponse = { jd?: JobDescription; fallback?: boolean; reason?: string };
+type JdResponse = { jd?: JobDescription; warnings?: string[]; fallback?: boolean; reason?: string };
 
 export function JdInput({
   onParsed,
   disabled,
   submitLabel = "Analyze job",
 }: {
-  onParsed: (jd: JobDescription) => void | Promise<void>;
+  onParsed: (jd: JobDescription, warnings: string[]) => void | Promise<void>;
   disabled?: boolean;
   submitLabel?: string;
 }) {
@@ -43,7 +43,7 @@ export function JdInput({
         setMode("text");
         return;
       }
-      if (data.jd) onParsed(data.jd);
+      if (data.jd) onParsed(data.jd, data.warnings ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't read the job description.");
     } finally {

@@ -105,6 +105,17 @@ export function JobCard({
         </div>
       </div>
 
+      {job.warnings && job.warnings.length > 0 && (
+        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-warn" role="note">
+          <p className="font-medium">This posting contains text aimed at AI tools. It was ignored and kept out of the keywords.</p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-4 text-muted">
+            {job.warnings.map((w) => (
+              <li key={w}>&ldquo;{w}&rdquo;</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {progress && (
         <div className="mt-4 rounded-lg bg-accent-soft/50 p-3">
           <TaskProgressBar task="match" progress={progress} />

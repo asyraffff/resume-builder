@@ -10,6 +10,8 @@ export type Job = {
   resume: Resume;
   report: MatchReport | null;
   suggestionStatus: Record<string, SuggestionStatus>;
+  /** Excerpts of text in the posting that was aimed at AI tools (ignored during analysis). */
+  warnings?: string[];
   createdAt: number;
   updatedAt: number;
 };

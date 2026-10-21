@@ -24,6 +24,7 @@ const BackupJob = z.object({
   resume: Resume,
   report: BackupReport.nullable(),
   suggestionStatus: SuggestionStatus,
+  warnings: z.array(z.string()).optional(),
   createdAt: z.number(),
   updatedAt: z.number(),
 });
