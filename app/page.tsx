@@ -41,7 +41,7 @@ export default function UploadPage() {
       fd.append("file", file);
       const data = await runStream<ParseResult>("parse", "/api/parse-resume", { body: fd }, setProgress);
       setParsed(data.resume, data.ats, data.fileName);
-      router.push("/analyze");
+      router.push("/ats");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed.");
     } finally {
@@ -119,7 +119,7 @@ export default function UploadPage() {
                   disabled={busy}
                   onContinue={() => {
                     switchWorkspace(w.id);
-                    router.push(w.jobs.length ? "/editor" : "/analyze");
+                    router.push(w.jobs.length ? "/editor" : "/ats");
                   }}
                   onDelete={() => {
                     const jobs = w.jobs.length ? ` and its ${w.jobs.length} tailored version${w.jobs.length > 1 ? "s" : ""}` : "";

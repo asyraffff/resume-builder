@@ -100,7 +100,7 @@ export function ScoreRing({ score, label, size = 88 }: { score: number; label?: 
 
 export const STEPS = [
   { href: "/", label: "Upload", short: "Upload" },
-  { href: "/analyze", label: "ATS check", short: "ATS" },
+  { href: "/ats", label: "ATS check", short: "ATS" },
   { href: "/job", label: "Job descriptions", short: "Jobs" },
   { href: "/editor", label: "Tailor & export", short: "Tailor" },
 ] as const;
