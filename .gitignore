@@ -44,3 +44,7 @@ next-env.d.ts
 # PDF fonts, copied from node_modules by scripts/copy-fonts.mjs
 /public/fonts/
 /public/pdfjs/
+
+# Playwright
+/test-results/
+/playwright-report/
