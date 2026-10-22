@@ -1,4 +1,5 @@
 import * as cheerio from "cheerio";
+import { BlockedAddressError, safeFetch } from "./safe-fetch";
 
 export type FetchJdResult = { ok: true; text: string } | { ok: false; reason: string };
 
@@ -82,11 +83,12 @@ export async function fetchJobDescription(raw: string): Promise<FetchJdResult> {
   const url = normaliseLinkedIn(parsed);
 
   // Follow redirects manually so every hop passes the same host check.
-  let res: Response | null = null;
+  let res: Awaited<ReturnType<typeof safeFetch>> | null = null;
   let current = url;
   for (let hop = 0; hop < 5; hop++) {
     try {
-      res = await fetch(current, {
+      // safeFetch refuses to connect if the host resolves to a private address (checked per connection).
+      res = await safeFetch(current, {
         headers: {
           "User-Agent":
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36",
@@ -96,8 +98,9 @@ export async function fetchJobDescription(raw: string): Promise<FetchJdResult> {
         redirect: "manual",
         signal: AbortSignal.timeout(10_000),
       });
-    } catch {
-      return { ok: false, reason: "Couldn't reach that page." };
+    } catch (err) {
+      const blocked = err instanceof Error && (err.cause instanceof BlockedAddressError || err instanceof BlockedAddressError);
+      return { ok: false, reason: blocked ? "That address isn't allowed." : "Couldn't reach that page." };
     }
     const location = res.status >= 300 && res.status < 400 ? res.headers.get("location") : null;
     if (!location) break;
@@ -111,8 +114,28 @@ export async function fetchJobDescription(raw: string): Promise<FetchJdResult> {
   }
   if (!res) return { ok: false, reason: "Too many redirects." };
   if (!res.ok) return { ok: false, reason: `The site responded with ${res.status}.` };
-  const html = (await res.text()).slice(0, 2_000_000);
+  const html = await readCapped(res, 2_000_000);
   const text = extractJobText(html).slice(0, 30_000);
   const failure = looksLikeFailure(text);
   return failure ? { ok: false, reason: failure } : { ok: true, text };
+}
+
+/** Reads at most `max` bytes of a response, so a huge page can't exhaust memory. */
+async function readCapped(res: Awaited<ReturnType<typeof safeFetch>>, max: number): Promise<string> {
+  if (!res.body) return "";
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let out = "";
+  let total = 0;
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    out += decoder.decode(value, { stream: true });
+    if (total >= max) {
+      await reader.cancel();
+      break;
+    }
+  }
+  return out + decoder.decode();
 }
