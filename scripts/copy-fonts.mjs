@@ -1,4 +1,5 @@
-// Copies the PDF export fonts from node_modules into public/fonts (run automatically before dev and build).
+// Copies the PDF export fonts (and the pdf.js worker used by the preview) from node_modules into public/
+// (run automatically before dev and build).
 // The font list lives in lib/export/fonts.ts; this script reads it so the two never drift apart.
 import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -27,3 +28,10 @@ for (const file of files) {
   copied++;
 }
 console.log(`fonts: ${files.length} available in public/fonts (${copied} copied)`);
+
+// The preview renders PDF pages with pdf.js, which runs its parser in a web worker loaded from this file.
+const workerFrom = require.resolve("pdfjs-dist/build/pdf.worker.min.mjs");
+const workerDir = path.join(root, "public/pdfjs");
+mkdirSync(workerDir, { recursive: true });
+copyFileSync(workerFrom, path.join(workerDir, "pdf.worker.min.mjs"));
+console.log("pdf.js worker copied to public/pdfjs");

@@ -15,6 +15,8 @@ import { placeholdersInResume } from "@/lib/placeholders";
 import { runAtsChecks } from "@/lib/ats-checks";
 import { AtsLiveCheck } from "@/components/AtsLiveCheck";
 import { CompareView } from "@/components/CompareView";
+import { LayoutPanel } from "@/components/LayoutPanel";
+import { PreviewView } from "@/components/PreviewView";
 import { FormatToolbar } from "@/components/editor/FormatToolbar";
 import { compareResumes } from "@/lib/diff";
 
@@ -22,7 +24,7 @@ export default function EditorPage() {
   const router = useRouter();
   const hydrated = useHydrated();
   const { resume, original, jd, report, suggestionStatus, activeJobId, past, future, undo, redo, resetToOriginal } = useResumeStore();
-  const [view, setView] = useState<"edit" | "compare">("edit");
+  const [view, setView] = useState<"edit" | "compare" | "preview">("edit");
   const changeCount = useMemo(() => (resume && original ? compareResumes(original, resume).total : 0), [resume, original]);
   const match = useMatchRunner();
   const [exporting, setExporting] = useState<"pdf" | "docx" | null>(null);
@@ -170,6 +172,7 @@ export default function EditorPage() {
                 [
                   ["edit", "Edit"],
                   ["compare", `Compare with original${changeCount ? ` (${changeCount})` : ""}`],
+                  ["preview", "Preview & layout"],
                 ] as const
               ).map(([v, label]) => (
                 <button
@@ -186,11 +189,17 @@ export default function EditorPage() {
           </div>
           <p className="mb-3 text-xs text-muted">
             {view === "compare" ? "What changed between your uploaded resume and this version. Switch back to Edit to make changes. " : null}
+            {view === "preview" ? "Exactly what the PDF will look like. Choose a template and spacing below; the Word file uses the same layout. " : null}
             {view === "edit" &&
               (jd ? <>Tailoring for <span className="font-medium text-foreground">{jd.title}{jd.company ? ` at ${jd.company}` : ""}</span>. Changes save automatically. </> : "Changes save automatically. ")}
             {view === "edit" && "Click any text to edit. Drag the ⋮⋮ handles to reorder sections, entries and bullets. Press Enter for a new bullet."}
           </p>
-          {view === "compare" && original ? (
+          {view === "preview" ? (
+            <div className="space-y-4">
+              <LayoutPanel resume={resume} />
+              <PreviewView resume={resume} />
+            </div>
+          ) : view === "compare" && original ? (
             <CompareView original={original} tailored={resume} />
           ) : (
             <div className="pl-7">
