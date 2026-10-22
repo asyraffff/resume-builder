@@ -1,5 +1,6 @@
 "use client";
 
+import { giveConsent, hasConsent } from "@/lib/privacy";
 import { applyEvent, startProgress, type Progress, type Stats, type StreamEvent, type Task } from "@/lib/stream-progress";
 
 const statsKey = (task: Task) => `resume-tailor-${task}-stats`;
@@ -85,6 +86,14 @@ async function* readEvents<D>(res: Response): AsyncGenerator<StreamEvent<D>> {
  * Throws an Error with a user-facing message on failure.
  */
 export async function runStream<D>(task: Task, url: string, init: RequestInit, onProgress: (p: Progress) => void): Promise<D> {
+  // Covers every path that sends data to the AI (e.g. restoring a backup, then adding a job without visiting Upload).
+  if (!hasConsent()) {
+    const ok = window.confirm(
+      "Your resume and job descriptions are sent to Anthropic's Claude AI to be analysed. They aren't stored on this site's server, and your saved work stays in this browser.\n\nContinue?",
+    );
+    if (!ok) throw new Error("Cancelled. Nothing was sent.");
+    giveConsent();
+  }
   const started = Date.now();
   let current = startProgress(started);
   onProgress(current);

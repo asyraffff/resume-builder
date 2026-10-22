@@ -1,6 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
+import Link from "next/link";
+import { giveConsent, hasConsent } from "@/lib/privacy";
 import { useRouter } from "next/navigation";
 import { Button, ErrorNote } from "@/components/ui";
 import { Header, StepNav } from "@/components/navigation";
@@ -11,6 +13,8 @@ import { runStream } from "@/components/stream-client";
 import type { Progress } from "@/lib/stream-progress";
 import { selectWorkspaces, useHydrated, useResumeStore } from "@/store/resume-store";
 import type { ParseResult } from "@/lib/schemas";
+
+const noSubscribe = () => () => {};
 
 const ACCEPT = ".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
@@ -23,6 +27,10 @@ export default function UploadPage() {
   const busy = progress !== null;
   const [error, setError] = useState<string | null>(null);
   const hydrated = useHydrated();
+  // Consent is read from this browser's storage; the server render assumes "not yet" and the checkbox appears after load.
+  const storedConsent = useSyncExternalStore(noSubscribe, hasConsent, () => false);
+  const [justAgreed, setJustAgreed] = useState(false);
+  const consented = storedConsent || justAgreed;
   const state = useResumeStore();
   const { setParsed, resume, activeWorkspaceId, switchWorkspace, deleteWorkspace } = state;
   const workspaces = selectWorkspaces(state);
@@ -30,6 +38,10 @@ export default function UploadPage() {
 
   async function upload(file: File) {
     setError(null);
+    if (!consented) {
+      setError("Please confirm the note above before uploading.");
+      return;
+    }
     if (!/\.(pdf|docx)$/i.test(file.name)) {
       setError("Please upload a PDF or Word (.docx) file.");
       return;
@@ -90,7 +102,28 @@ export default function UploadPage() {
             <>
               <p className="font-medium">{workspaces.length ? "Upload another resume" : "Drag and drop your resume here"}</p>
               <p className="mt-1 text-sm text-muted">PDF or DOCX, up to 4 MB</p>
-              <Button className="mt-5" onClick={() => inputRef.current?.click()}>
+              {hydrated && !consented && (
+                <label className="mt-5 flex max-w-md cursor-pointer items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 p-3 text-left text-sm">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    onChange={(e) => {
+                      if (!e.target.checked) return;
+                      giveConsent();
+                      setJustAgreed(true);
+                      setError(null);
+                    }}
+                  />
+                  <span>
+                    I understand my resume will be sent to Anthropic&apos;s Claude AI to be analysed. It isn&apos;t stored on this
+                    site&apos;s server, and my saved work stays in this browser.{" "}
+                    <Link href="/privacy" className="text-accent hover:underline" target="_blank">
+                      Privacy details
+                    </Link>
+                  </span>
+                </label>
+              )}
+              <Button className="mt-5" onClick={() => inputRef.current?.click()} disabled={!consented}>
                 Choose file
               </Button>
               <input
@@ -164,10 +197,6 @@ export default function UploadPage() {
               </div>
             ))}
           </div>
-          <p className="mt-8 text-xs text-muted">
-            Privacy: your file is sent to the AI for analysis and is not stored on our server. Your resumes and drafts are kept only in this
-            browser.
-          </p>
         </div>
       </footer>
     </>
