@@ -2,6 +2,7 @@ import { z } from "zod";
 import { callStructuredStream } from "@/lib/claude";
 import { MATCH_SYSTEM } from "@/lib/prompts";
 import { JobDescription, MatchReport, Resume } from "@/lib/schemas";
+import { guardRequest } from "@/lib/guard";
 import { badRequest } from "@/lib/api-error";
 import { ndjsonStream } from "@/lib/stream-response";
 import { pinOriginals } from "@/lib/apply-suggestion";
@@ -15,6 +16,8 @@ const Body = z.object({ resume: Resume, jd: JobDescription });
 
 /** Streams progress events, then the match report (see lib/stream-progress.ts). */
 export async function POST(req: Request) {
+  const blocked = guardRequest(req, "match");
+  if (blocked) return blocked;
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return badRequest("Missing resume or job description.");
   const { resume, jd } = parsed.data;

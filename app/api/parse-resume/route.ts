@@ -5,6 +5,7 @@ import { PARSE_RESUME_SYSTEM } from "@/lib/prompts";
 import { ParseResumeOutput, type AtsReport, type ParseResult } from "@/lib/schemas";
 import { withIds } from "@/lib/ids";
 import { mergeAts, runAtsChecks } from "@/lib/ats-checks";
+import { guardRequest } from "@/lib/guard";
 import { badRequest, errorResponse } from "@/lib/api-error";
 import { ndjsonStream } from "@/lib/stream-response";
 
@@ -16,6 +17,8 @@ const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingm
 
 /** Validates the upload, then streams progress events and finally the parsed resume and ATS report. */
 export async function POST(req: Request) {
+  const blocked = guardRequest(req, "parse-resume");
+  if (blocked) return blocked;
   let content: Anthropic.Beta.Messages.BetaContentBlockParam[];
   let rawText: string | undefined;
   let isPdf: boolean;

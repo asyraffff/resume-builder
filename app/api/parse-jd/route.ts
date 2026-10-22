@@ -5,6 +5,7 @@ import { PARSE_JD_SYSTEM } from "@/lib/prompts";
 import { JobDescription, type ParseJdResult } from "@/lib/schemas";
 import { fetchJobDescription } from "@/lib/fetch-jd";
 import { screenJobDescription } from "@/lib/screen-jd";
+import { guardRequest } from "@/lib/guard";
 import { badRequest, errorResponse } from "@/lib/api-error";
 import { ndjsonStream } from "@/lib/stream-response";
 
@@ -20,6 +21,8 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
  * are answered with plain JSON before streaming starts; then progress events stream, followed by the result.
  */
 export async function POST(req: Request) {
+  const blocked = guardRequest(req, "parse-jd");
+  if (blocked) return blocked;
   let content: Anthropic.Beta.Messages.BetaContentBlockParam[];
   let rawText = "";
 

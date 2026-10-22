@@ -3,6 +3,35 @@
 import { applyEvent, startProgress, type Progress, type Stats, type StreamEvent, type Task } from "@/lib/stream-progress";
 
 const statsKey = (task: Task) => `resume-tailor-${task}-stats`;
+const ACCESS_KEY = "resume-tailor-access-code";
+
+function readAccessCode(): string {
+  try {
+    return localStorage.getItem(ACCESS_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function withAccessCode(init: RequestInit): RequestInit {
+  const code = readAccessCode();
+  if (!code) return init;
+  const headers = new Headers(init.headers);
+  headers.set("x-access-code", code);
+  return { ...init, headers };
+}
+
+/** Asks for the app's access code (when the owner has locked it) and remembers it in this browser. */
+function askForAccessCode(retry: boolean): boolean {
+  const code = window.prompt(retry ? "That access code isn't right. Try again:" : "This app is private. Enter the access code you were given:");
+  if (!code?.trim()) return false;
+  try {
+    localStorage.setItem(ACCESS_KEY, code.trim());
+  } catch {
+    /* fine: it will be asked again next time */
+  }
+  return true;
+}
 
 /** A request rejected before streaming started; `data` is the server's JSON body. */
 export class StreamRequestError extends Error {
@@ -60,8 +89,14 @@ export async function runStream<D>(task: Task, url: string, init: RequestInit, o
   let current = startProgress(started);
   onProgress(current);
 
-  const res = await fetch(url, { method: "POST", ...init });
-  // Validation errors come back as plain JSON before any streaming starts.
+  let res = await fetch(url, { method: "POST", ...withAccessCode(init) });
+  // A locked app answers 401: ask for the code and retry (twice at most, so a wrong code doesn't loop forever).
+  for (let attempt = 0; res.status === 401 && attempt < 2; attempt++) {
+    const data = await res.clone().json().catch(() => ({}));
+    if (!data.needsAccessCode || !askForAccessCode(attempt > 0 || !!readAccessCode())) break;
+    res = await fetch(url, { method: "POST", ...withAccessCode(init) });
+  }
+  // Validation errors and rate limits come back as plain JSON before any streaming starts.
   if (!res.ok || !res.body) {
     const data = await res.json().catch(() => ({}));
     throw new StreamRequestError(data.error ?? "Request failed.", data);
