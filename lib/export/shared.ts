@@ -1,5 +1,5 @@
 import type { Item, JobDescription, Resume, Section } from "../schemas";
-import { contactHref, parseInline, tidyUrl, type Segment } from "../inline";
+import { contactHref, parseInline, plainText, tidyUrl, type Segment } from "../inline";
 
 export const visibleSections = (r: Resume) =>
   r.sections.filter((s) => !s.hidden && s.items.some((it) => it.heading || it.subheading || it.bullets.some((b) => b.text.trim())));
@@ -72,4 +72,9 @@ export function downloadBlob(blob: Blob, fileName: string) {
 export async function countPdfPages(blob: Blob): Promise<number> {
   const text = new TextDecoder("latin1").decode(await blob.arrayBuffer());
   return (text.match(/\/Type\s*\/Page(?![a-z])/g) ?? []).length;
+}
+
+/** Words a reader sees in the export (formatting markers and hidden sections excluded). */
+export function countWords(r: Resume): number {
+  return plainText(exportText(r)).split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
 }

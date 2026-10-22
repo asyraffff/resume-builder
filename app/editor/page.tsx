@@ -17,6 +17,7 @@ import { AtsLiveCheck } from "@/components/AtsLiveCheck";
 import { CompareView } from "@/components/CompareView";
 import { LayoutPanel } from "@/components/LayoutPanel";
 import { PreviewView } from "@/components/PreviewView";
+import { PageMeter } from "@/components/PageMeter";
 import { FormatToolbar } from "@/components/editor/FormatToolbar";
 import { compareResumes } from "@/lib/diff";
 
@@ -203,8 +204,9 @@ export default function EditorPage() {
             <CompareView original={original} tailored={resume} />
           ) : (
             <div className="pl-7">
-              <div className="sticky top-16 z-10 mb-3 flex justify-center">
+              <div className="sticky top-16 z-10 mb-3 flex flex-wrap items-center justify-center gap-2">
                 <FormatToolbar />
+                <PageMeter resume={resume} />
               </div>
               <ResumeEditor highlight={highlight} />
             </div>

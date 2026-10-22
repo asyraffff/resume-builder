@@ -5,7 +5,7 @@ import JSZip from "jszip";
 import { buildDocx } from "@/lib/export/docx";
 import { buildPdf, renderPdf } from "@/lib/export/pdf";
 import { fontPackage, scriptFallbacks } from "@/lib/export/fonts";
-import { exportFileName } from "@/lib/export/shared";
+import { countWords, exportFileName } from "@/lib/export/shared";
 import type { Resume } from "@/lib/schemas";
 import { sampleResume } from "./fixtures";
 
@@ -152,5 +152,16 @@ describe("file names", () => {
   it("builds a descriptive file name", () => {
     expect(exportFileName(sampleResume(), { company: "Acme Health", title: "Sr. Engineer" } as never, "pdf")).toBe("Alex_Doe_Acme_Health_Sr_Engineer.pdf");
     expect(exportFileName(sampleResume(), null, "docx")).toBe("Alex_Doe.docx");
+  });
+});
+
+describe("word count", () => {
+  it("counts visible words without formatting markers or hidden sections", () => {
+    const r = sampleResume();
+    const base = countWords(r);
+    r.sections[0].items[0].bullets[0].text = "Built **fast** things for [Acme](https://acme.com)";
+    expect(countWords(r)).toBe(base + 3); // "Built things" (2) -> "Built fast things for Acme" (5)
+    r.sections[1].hidden = true;
+    expect(countWords(r)).toBeLessThan(base + 3);
   });
 });
