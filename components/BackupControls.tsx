@@ -5,6 +5,7 @@ import { BackupError, MAX_BACKUP_BYTES, backupFileName, createBackup, describeIm
 import { downloadBlob } from "@/lib/export/shared";
 import { selectWorkspaces, useResumeStore } from "@/store/resume-store";
 import { Button } from "./ui";
+import { confirmDialog } from "./dialog";
 
 /** Back up every saved resume to a file, or restore from one. */
 export function BackupControls({ compact }: { compact?: boolean }) {
@@ -32,7 +33,12 @@ export function BackupControls({ compact }: { compact?: boolean }) {
       if (!incoming.length) throw new BackupError("That backup doesn't contain any resumes.");
       const { added, replaced, total } = describeImport(selectWorkspaces(useResumeStore.getState()), incoming);
       const detail = replaced ? `\n\n${replaced} of them already exist here and will be replaced by the backup copy.` : "";
-      if (!confirm(`Restore ${total} resume${total > 1 ? "s" : ""} from "${file.name}"?${detail}`)) return;
+      const ok = await confirmDialog({
+        title: `Restore ${total} resume${total > 1 ? "s" : ""} from "${file.name}"?`,
+        message: detail.trim() || undefined,
+        confirmLabel: "Restore",
+      });
+      if (!ok) return;
       importWorkspaces(incoming);
       setMessage({
         tone: "good",

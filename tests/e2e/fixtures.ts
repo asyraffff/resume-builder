@@ -96,8 +96,15 @@ const ndjson = (data: unknown) =>
 
 const fulfill = (route: Route, body: string) => route.fulfill({ status: 200, contentType: "application/x-ndjson", body });
 
-/** Replays all three AI routes. Returns counters so tests can check what was called. */
+/**
+ * Replays all three AI routes. Returns counters so tests can check what was called. Also makes the browser's own
+ * confirm/prompt answer "no" at once, as some in-app browsers do, so anything still relying on them fails here.
+ */
 export async function mockAi(page: Page) {
+  await page.addInitScript(() => {
+    window.confirm = () => false;
+    window.prompt = () => null;
+  });
   const calls = { parseResume: 0, parseJd: 0, match: 0 };
   await page.route("**/api/parse-resume", (r) => {
     calls.parseResume++;

@@ -4,6 +4,7 @@ import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import { SiteFooter } from "@/components/SiteFooter";
+import { DialogHost } from "@/components/dialog";
 
 export const metadata: Metadata = {
   title: "Resume Tailor",
@@ -20,6 +21,7 @@ export default function RootLayout({
       <body className={`${GeistSans.variable} ${GeistMono.variable} flex min-h-screen flex-col antialiased`}>
         <div className="flex-1">{children}</div>
         <SiteFooter />
+        <DialogHost />
       </body>
     </html>
   );

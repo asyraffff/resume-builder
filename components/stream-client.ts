@@ -1,6 +1,7 @@
 "use client";
 
 import { giveConsent, hasConsent } from "@/lib/privacy";
+import { confirmDialog, promptDialog } from "./dialog";
 import { applyEvent, startProgress, type Progress, type Stats, type StreamEvent, type Task } from "@/lib/stream-progress";
 
 const statsKey = (task: Task) => `resume-tailor-${task}-stats`;
@@ -23,8 +24,13 @@ function withAccessCode(init: RequestInit): RequestInit {
 }
 
 /** Asks for the app's access code (when the owner has locked it) and remembers it in this browser. */
-function askForAccessCode(retry: boolean): boolean {
-  const code = window.prompt(retry ? "That access code isn't right. Try again:" : "This app is private. Enter the access code you were given:");
+async function askForAccessCode(retry: boolean): Promise<boolean> {
+  const code = await promptDialog({
+    title: retry ? "That access code isn't right" : "This app is private",
+    message: retry ? "Check the code and try again." : "Enter the access code you were given.",
+    input: { label: "Access code", type: "password" },
+    confirmLabel: "Continue",
+  });
   if (!code?.trim()) return false;
   try {
     localStorage.setItem(ACCESS_KEY, code.trim());
@@ -88,9 +94,12 @@ async function* readEvents<D>(res: Response): AsyncGenerator<StreamEvent<D>> {
 export async function runStream<D>(task: Task, url: string, init: RequestInit, onProgress: (p: Progress) => void): Promise<D> {
   // Covers every path that sends data to the AI (e.g. restoring a backup, then adding a job without visiting Upload).
   if (!hasConsent()) {
-    const ok = window.confirm(
-      "Your resume and job descriptions are sent to Anthropic's Claude AI to be analysed. They aren't stored on this site's server, and your saved work stays in this browser.\n\nContinue?",
-    );
+    const ok = await confirmDialog({
+      title: "Before anything is sent",
+      message:
+        "Your resume and job descriptions are sent to Anthropic's Claude AI to be analysed. They aren't stored on this site's server, and your saved work stays in this browser.",
+      confirmLabel: "Continue",
+    });
     if (!ok) throw new Error("Cancelled. Nothing was sent.");
     giveConsent();
   }
@@ -102,7 +111,7 @@ export async function runStream<D>(task: Task, url: string, init: RequestInit, o
   // A locked app answers 401: ask for the code and retry (twice at most, so a wrong code doesn't loop forever).
   for (let attempt = 0; res.status === 401 && attempt < 2; attempt++) {
     const data = await res.clone().json().catch(() => ({}));
-    if (!data.needsAccessCode || !askForAccessCode(attempt > 0 || !!readAccessCode())) break;
+    if (!data.needsAccessCode || !(await askForAccessCode(attempt > 0 || !!readAccessCode()))) break;
     res = await fetch(url, { method: "POST", ...withAccessCode(init) });
   }
   // Validation errors and rate limits come back as plain JSON before any streaming starts.

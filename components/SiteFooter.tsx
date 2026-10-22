@@ -3,16 +3,21 @@
 import Link from "next/link";
 import { deleteAllLocalData } from "@/lib/privacy";
 import { useResumeStore } from "@/store/resume-store";
+import { confirmDialog } from "./dialog";
 
 /** Footer on every page: privacy policy and a way to wipe everything stored in this browser. */
 export function SiteFooter() {
   const startOver = useResumeStore((s) => s.startOver);
 
-  function deleteAll() {
-    const ok = confirm(
-      "Delete all your data from this browser?\n\nThis removes every resume, job, tailored version and setting saved here. " +
-        "It can't be undone, so use \"Back up all\" first if you might want them later.",
-    );
+  async function deleteAll() {
+    const ok = await confirmDialog({
+      title: "Delete all your data from this browser?",
+      message:
+        "This removes every resume, job, tailored version and setting saved here. " +
+        'It can\'t be undone, so use "Back up all" first if you might want them later.',
+      confirmLabel: "Delete everything",
+      danger: true,
+    });
     if (!ok) return;
     startOver();
     deleteAllLocalData();

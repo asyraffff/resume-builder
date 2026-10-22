@@ -9,6 +9,7 @@ import { Header, StepNav } from "@/components/navigation";
 import { ResumeRow } from "@/components/ResumeRow";
 import { TaskProgressBar } from "@/components/TaskProgressBar";
 import { BackupControls } from "@/components/BackupControls";
+import { confirmDialog } from "@/components/dialog";
 import { runStream } from "@/components/stream-client";
 import type { Progress } from "@/lib/stream-progress";
 import { selectWorkspaces, useHydrated, useResumeStore } from "@/store/resume-store";
@@ -165,9 +166,15 @@ export default function UploadPage() {
                     switchWorkspace(w.id);
                     router.push(w.jobs.length ? "/editor" : "/ats");
                   }}
-                  onDelete={() => {
+                  onDelete={async () => {
                     const jobs = w.jobs.length ? ` and its ${w.jobs.length} tailored version${w.jobs.length > 1 ? "s" : ""}` : "";
-                    if (confirm(`Delete "${w.fileName || w.original.contact.name}"${jobs}? This can't be undone.`)) deleteWorkspace(w.id);
+                    const ok = await confirmDialog({
+                      title: `Delete "${w.fileName || w.original.contact.name}"?`,
+                      message: `This resume${jobs} will be deleted from this browser. This can't be undone.`,
+                      confirmLabel: "Delete",
+                      danger: true,
+                    });
+                    if (ok) deleteWorkspace(w.id);
                   }}
                 />
               ))}

@@ -8,6 +8,7 @@ import { JobCard } from "@/components/JobCard";
 import { Card, Spinner } from "@/components/ui";
 import { Header, StepNav } from "@/components/navigation";
 import { selectJobs, useHydrated, useResumeStore, type StartFrom } from "@/store/resume-store";
+import { confirmDialog } from "@/components/dialog";
 
 export default function JobsPage() {
   const router = useRouter();
@@ -65,8 +66,14 @@ export default function JobsPage() {
                 onOpen={() => openInEditor(job.id)}
                 onMatch={() => match.run(job.id)}
                 onRename={(label) => renameJob(job.id, label)}
-                onDelete={() => {
-                  if (confirm(`Delete "${job.label}" and its tailored resume? This can't be undone.`)) deleteJob(job.id);
+                onDelete={async () => {
+                  const ok = await confirmDialog({
+                    title: `Delete "${job.label}"?`,
+                    message: "Its tailored resume and match report will be deleted. This can't be undone.",
+                    confirmLabel: "Delete",
+                    danger: true,
+                  });
+                  if (ok) deleteJob(job.id);
                 }}
               />
             ))}

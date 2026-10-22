@@ -11,6 +11,7 @@ import { Button, ErrorNote, LinkButton, Spinner } from "@/components/ui";
 import { Header, StepNav } from "@/components/navigation";
 import { useHydrated, useResumeStore } from "@/store/resume-store";
 import { downloadBlob, exportFileName } from "@/lib/export/shared";
+import { confirmDialog } from "@/components/dialog";
 import { placeholdersInResume } from "@/lib/placeholders";
 import { runAtsChecks } from "@/lib/ats-checks";
 import { AtsLiveCheck } from "@/components/AtsLiveCheck";
@@ -77,7 +78,8 @@ export default function EditorPage() {
       const list = serious
         .map((i) => (i.topic.test("placeholder") && placeholders.length ? `• ${i.title}\n${placeholders.join("\n")}` : `• ${i.title}`))
         .join("\n");
-      if (!confirm(`Before you export, these need attention:\n\n${list}\n\nExport anyway?`)) return;
+      const ok = await confirmDialog({ title: "Before you export, these need attention", message: list, confirmLabel: "Export anyway", cancelLabel: "Go back and fix" });
+      if (!ok) return;
     }
     setError(null);
     setExporting(kind);
@@ -157,7 +159,15 @@ export default function EditorPage() {
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => confirm("Discard all edits to this resume and go back to the one you uploaded?") && resetToOriginal()}
+                onClick={async () => {
+                  const ok = await confirmDialog({
+                    title: "Reset to the uploaded resume?",
+                    message: "All edits to this resume will be discarded.",
+                    confirmLabel: "Discard edits",
+                    danger: true,
+                  });
+                  if (ok) resetToOriginal();
+                }}
               >
                 Reset to uploaded resume
               </Button>

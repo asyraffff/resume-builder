@@ -45,12 +45,35 @@ test("full journey: consent, upload, ATS, add a job, tailor, compare, preview an
   await page.getByRole("radio", { name: /Modern/ }).click();
   await expect(page.getByRole("img", { name: "Page 1 of 1" })).toBeVisible({ timeout: 30_000 });
 
-  // Export both formats; the export warns about the missing phone number first.
-  page.on("dialog", (d) => d.accept());
-  const [pdf] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: /PDF/ }).click()]);
+  // Export both formats; each warns about the missing phone number first. "Go back and fix" cancels.
+  const warning = page.getByRole("dialog", { name: "Before you export, these need attention" });
+  await page.getByRole("button", { name: /PDF/ }).click();
+  await expect(warning).toContainText("phone");
+  await warning.getByRole("button", { name: "Go back and fix" }).click();
+  await expect(warning).toHaveCount(0);
+
+  await page.getByRole("button", { name: /PDF/ }).click();
+  const [pdf] = await Promise.all([page.waitForEvent("download"), warning.getByRole("button", { name: "Export anyway" }).click()]);
   expect(pdf.suggestedFilename()).toBe("Taylor_Morgan_FoodRush_Senior_Frontend_Engineer.pdf");
-  const [docx] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Word" }).click()]);
+  await page.getByRole("button", { name: "Word" }).click();
+  const [docx] = await Promise.all([page.waitForEvent("download"), warning.getByRole("button", { name: "Export anyway" }).click()]);
   expect(docx.suggestedFilename()).toBe("Taylor_Morgan_FoodRush_Senior_Frontend_Engineer.docx");
+});
+
+test("adding a link from the formatting toolbar", async ({ page }) => {
+  await mockAi(page);
+  await uploadSample(page);
+  await page.goto("/editor");
+  const bullet = page.getByText("Worked on the ordering web app using React");
+  await bullet.click();
+  await page.keyboard.press("End");
+  for (let i = 0; i < "React".length; i++) await page.keyboard.press("Shift+ArrowLeft");
+  await page.keyboard.press("Control+k");
+  const dialog = page.getByRole("dialog", { name: "Add a link" });
+  await dialog.getByLabel("Web address or email").fill("react.dev");
+  await dialog.getByRole("button", { name: "Add link" }).click();
+  await page.keyboard.press("Escape"); // leave the field so it shows the formatted text
+  await expect(page.getByRole("link", { name: "React", exact: true })).toHaveAttribute("href", "https://react.dev");
 });
 
 test("step navigation and the old /analyze address", async ({ page }) => {

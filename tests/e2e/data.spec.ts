@@ -13,13 +13,14 @@ test("back up, delete all data, then restore from the backup", async ({ page }) 
   const backup = JSON.parse(await readFile((await download.path())!, "utf8"));
   expect(backup.workspaces).toHaveLength(1);
 
-  page.on("dialog", (d) => d.accept());
   await page.getByRole("button", { name: "Delete all my data" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Delete everything" }).click();
   await page.waitForLoadState("load");
   await expect(page.getByText("taylor_morgan.pdf")).toHaveCount(0);
   expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("resume-tailor")))).toEqual([]);
 
   await page.locator('input[type="file"][accept*="json"]').setInputFiles((await download.path())!);
+  await page.getByRole("dialog").getByRole("button", { name: "Restore" }).click();
   await expect(page.getByText("Added 1 resume from the backup.")).toBeVisible();
   await expect(page.getByText("taylor_morgan.pdf")).toBeVisible();
 });

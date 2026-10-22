@@ -1,6 +1,7 @@
 "use client";
 
 import { safeHref } from "@/lib/inline";
+import { promptDialog } from "../dialog";
 
 export type FormatKind = "bold" | "italic" | "link";
 
@@ -37,10 +38,7 @@ export function applyFormat(kind: FormatKind): boolean {
   const core = selected.trim();
 
   if (kind === "link") {
-    const url = window.prompt("Link address", "https://");
-    const href = url ? normaliseLink(url) : null;
-    if (!href) return true;
-    insert(`${lead}[${core || url!.trim()}](${href})${trail}`);
+    void addLink(el, selectionOffsets(el, sel.getRangeAt(0)), { lead, core, trail });
     return true;
   }
 
@@ -59,6 +57,55 @@ export function applyFormat(kind: FormatKind): boolean {
   const wrapped = core.startsWith(m) && core.endsWith(m) && core.length > m.length * 2;
   insert(lead + (wrapped ? core.slice(m.length, -m.length) : m + core + m) + trail);
   return true;
+}
+
+/**
+ * Asks for the address in an in-page dialog. The dialog takes focus, and the field saves and redraws itself on
+ * blur, so the selection is remembered as character offsets and restored once the field has focus again.
+ */
+async function addLink(el: HTMLElement, [start, end]: [number, number], { lead, core, trail }: { lead: string; core: string; trail: string }) {
+  const url = await promptDialog({
+    title: "Add a link",
+    input: { label: "Web address or email" },
+    confirmLabel: "Add link",
+  });
+  const href = url ? normaliseLink(url) : null;
+  el.focus();
+  await new Promise((r) => setTimeout(r, 0)); // let the field swap back to its raw text first
+  selectOffsets(el, start, end);
+  if (href) insert(`${lead}[${core || url!}](${href})${trail}`);
+}
+
+function selectionOffsets(el: HTMLElement, range: Range): [number, number] {
+  const before = document.createRange();
+  before.selectNodeContents(el);
+  before.setEnd(range.startContainer, range.startOffset);
+  const start = before.toString().length;
+  return [start, start + range.toString().length];
+}
+
+function selectOffsets(el: HTMLElement, start: number, end: number) {
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  range.collapse(false); // fallback: the end of the field
+  let pos = 0;
+  let startSet = false;
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    const len = n.textContent?.length ?? 0;
+    if (!startSet && start <= pos + len) {
+      range.setStart(n, start - pos);
+      startSet = true;
+    }
+    if (startSet && end <= pos + len) {
+      range.setEnd(n, end - pos);
+      break;
+    }
+    pos += len;
+  }
+  const sel = window.getSelection();
+  sel?.removeAllRanges();
+  sel?.addRange(range);
 }
 
 function insert(text: string) {
