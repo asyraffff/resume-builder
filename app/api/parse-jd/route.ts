@@ -64,7 +64,7 @@ export async function POST(req: Request) {
 
   return ndjsonStream<ParseJdResult>(
     async (onProgress) => {
-      const parsed = await callStructuredStream({ schema: JobDescription, system: PARSE_JD_SYSTEM, content, effort: "low" }, onProgress);
+      const parsed = await callStructuredStream({ role: "reading", schema: JobDescription, system: PARSE_JD_SYSTEM, content, effort: "low" }, onProgress);
       const { jd, warnings } = screenJobDescription(parsed, rawText);
       if (!jd.title && jd.requiredSkills.length === 0 && jd.responsibilities.length === 0) {
         throw new AiError(`That doesn't look like a job description. ${jd.summary}`.trim(), 400);

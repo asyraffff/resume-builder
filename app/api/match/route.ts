@@ -40,14 +40,15 @@ export async function POST(req: Request) {
     async (onProgress) => {
       const report = await callStructuredStream(
         {
+          role: "matching",
           schema: MatchReport,
           system: MATCH_SYSTEM,
           effort: "high",
           content: [
-            {
-              type: "text",
-              text: `<job_description>\n${JSON.stringify(jd, null, 2)}\n</job_description>\n\n<resume>\n${JSON.stringify(visible, null, 2)}\n</resume>`,
-            },
+            // The job comes first and is cached, so re-checking the score for the same job only pays full price for the
+            // (edited) resume.
+            { type: "text", text: `<job_description>\n${JSON.stringify(jd, null, 2)}\n</job_description>`, cache_control: { type: "ephemeral" } },
+            { type: "text", text: `<resume>\n${JSON.stringify(visible, null, 2)}\n</resume>` },
           ],
         },
         onProgress,

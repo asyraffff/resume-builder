@@ -3,7 +3,12 @@ import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import type { z } from "zod";
 
-const MODEL = "claude-opus-5-5";
+/**
+ * Reading resumes and job postings is extraction work, done well (and at about half the cost) by Sonnet.
+ * Matching writes the suggestions people act on, so it stays on Opus.
+ */
+export const MODELS = { reading: "claude-sonnet-5-5", matching: "claude-opus-5-5" } as const;
+export type ModelRole = keyof typeof MODELS;
 
 let client: Anthropic | null = null;
 function getClient() {
@@ -29,6 +34,7 @@ export class AiError extends Error {
 type Effort = "low" | "medium" | "high" | "xhigh" | "max";
 
 type CallOptions<S extends z.ZodType> = {
+  role: ModelRole;
   schema: S;
   system: string;
   content: Anthropic.Beta.Messages.BetaContentBlockParam[];
@@ -38,9 +44,10 @@ type CallOptions<S extends z.ZodType> = {
 
 function buildParams<S extends z.ZodType>(opts: CallOptions<S>, defaultMaxTokens: number) {
   return {
-    model: MODEL,
+    model: MODELS[opts.role],
     max_tokens: opts.maxTokens ?? defaultMaxTokens,
-    system: opts.system,
+    // The instructions are identical for every request, so they're cached (reads cost ~10% of normal input).
+    system: [{ type: "text" as const, text: opts.system, cache_control: { type: "ephemeral" as const } }],
     messages: [{ role: "user" as const, content: opts.content }],
     output_config: {
       effort: opts.effort ?? "medium",
@@ -79,7 +86,10 @@ function toAiError(err: unknown): unknown {
 
 function checkResult<T>(response: Anthropic.Beta.Messages.BetaMessage & { parsed_output?: T | null }, maxTokens: number): T {
   if (process.env.NODE_ENV !== "production") {
-    console.info(`Claude usage: ${response.usage.input_tokens} in / ${response.usage.output_tokens} out (max ${maxTokens})`);
+    const u = response.usage;
+    console.info(
+      `Claude usage (${response.model}): ${u.input_tokens} in + ${u.cache_read_input_tokens ?? 0} cache read + ${u.cache_creation_input_tokens ?? 0} cache write / ${u.output_tokens} out (max ${maxTokens})`,
+    );
   }
   if (response.stop_reason === "refusal") {
     throw new AiError("The AI declined to process this content. Try different input.", 422);

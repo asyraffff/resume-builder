@@ -31,7 +31,7 @@ Everything revolves around one structured `Resume` JSON (`lib/schemas.ts`):
 
 Uploading and matching stream their progress as newline-delimited JSON (`lib/stream-response.ts` on the server, `lib/stream-progress.ts` for the shared progress model), which drives the progress bars.
 
-All Claude calls go through `lib/claude.ts` (`claude-opus-5-5`, structured outputs via Zod, server-side refusal fallback, stop-reason checks).
+All Claude calls go through `lib/claude.ts`: Sonnet 5.5 reads resumes and job postings, Opus 5.5 does the matching. Structured outputs via Zod, server-side refusal fallback, stop-reason checks, and prompt caching (the instructions on every call, plus the job description when matching, so re-checks reuse it).
 
 ## Your data
 

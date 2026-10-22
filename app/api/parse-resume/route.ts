@@ -55,7 +55,7 @@ export async function POST(req: Request) {
 
   return ndjsonStream<ParseResult>(
     async (onProgress) => {
-      const out = await callStructuredStream({ schema: ParseResumeOutput, system: PARSE_RESUME_SYSTEM, content, effort: "medium" }, onProgress);
+      const out = await callStructuredStream({ role: "reading", schema: ParseResumeOutput, system: PARSE_RESUME_SYSTEM, content, effort: "medium" }, onProgress);
       const resume = withIds(out.resume);
       const rules = runAtsChecks(resume, { fileType: isPdf ? "pdf" : "docx", rawText });
       const ats: AtsReport = { ...out.ats, ...mergeAts(out.ats.score, out.ats.issues, rules) };
