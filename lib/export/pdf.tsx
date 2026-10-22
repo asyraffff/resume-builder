@@ -55,9 +55,11 @@ function styles(spec: LayoutSpec, families: string[]) {
       borderBottomWidth: spec.headingRule ? 0.75 : 0,
       borderBottomColor: "#9a9a9a",
     },
-    itemRow: { flexDirection: "row", justifyContent: "space-between", marginTop: spec.itemGap },
-    itemTitle: { fontWeight: 700, flexShrink: 1, paddingRight: 8 },
-    itemMeta: { fontSize: spec.metaSize, color: "#444444", flexShrink: 0 },
+    itemRow: { flexDirection: "row", alignItems: "flex-start", marginTop: spec.itemGap },
+    // The title takes whatever width the dates leave (basis 0), so long titles wrap instead of running under the
+    // dates or pushing them past the margin. The dates keep their natural width, up to 45% of the line.
+    itemTitle: { fontWeight: 700, flexGrow: 1, flexShrink: 1, flexBasis: 0, paddingRight: 10 },
+    itemMeta: { fontSize: spec.metaSize, color: "#444444", flexShrink: 0, maxWidth: "45%", textAlign: "right", marginTop: 0.5 },
     bulletRow: { flexDirection: "row", marginTop: spec.bulletGap, paddingLeft: 6 },
     bulletDot: { width: 10 },
     bulletText: { flex: 1 },

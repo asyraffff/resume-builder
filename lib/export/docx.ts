@@ -6,7 +6,6 @@ import {
   LevelFormat,
   Packer,
   Paragraph,
-  TabStopPosition,
   TabStopType,
   TextRun,
   type ParagraphChild,
@@ -21,6 +20,8 @@ const WORD_FONT = { sans: "Calibri", serif: "Cambria" } as const;
 
 const pt = (n: number) => Math.round(n * 2); // docx sizes are half-points
 const twip = (n: number) => Math.round(n * 20); // spacing and margins are twentieths of a point
+const A4_WIDTH = 11906; // A4 is 210 x 297 mm: 11906 x 16838 twentieths of a point
+const A4_HEIGHT = 16838;
 
 function runs(segments: Segment[], spec: LayoutSpec, size: number, extra: { bold?: boolean; color?: string } = {}): ParagraphChild[] {
   const font = WORD_FONT[spec.font];
@@ -103,7 +104,8 @@ export async function buildDocx(r: Resume): Promise<Blob> {
           new Paragraph({
             keepNext: true,
             spacing: { before: twip(spec.itemGap), line },
-            tabStops: [{ type: TabStopType.RIGHT, position: TabStopPosition.MAX }],
+            // Right edge of the text area for this resume's margins (TabStopPosition.MAX assumes 1-inch margins).
+            tabStops: [{ type: TabStopType.RIGHT, position: A4_WIDTH - 2 * twip(spec.marginX) }],
             children: [
               ...runs(title, spec, spec.fontSize, { bold: true }),
               ...(meta ? [new TextRun({ text: `\t${meta}`, size: pt(spec.metaSize), font, color: "444444" })] : []),
@@ -139,7 +141,7 @@ export async function buildDocx(r: Resume): Promise<Blob> {
     styles: { default: { document: { run: { font, size: pt(spec.fontSize) } } } },
     sections: [
       {
-        properties: { page: { margin: { top: twip(spec.marginY), bottom: twip(spec.marginY), left: twip(spec.marginX), right: twip(spec.marginX) } } },
+        properties: { page: { size: { width: A4_WIDTH, height: A4_HEIGHT }, margin: { top: twip(spec.marginY), bottom: twip(spec.marginY), left: twip(spec.marginX), right: twip(spec.marginX) } } },
         children,
       },
     ],

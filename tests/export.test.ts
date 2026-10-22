@@ -5,6 +5,7 @@ import JSZip from "jszip";
 import { buildDocx } from "@/lib/export/docx";
 import { buildPdf, renderPdf } from "@/lib/export/pdf";
 import { fontPackage, scriptFallbacks } from "@/lib/export/fonts";
+import { resolveLayout } from "@/lib/layout";
 import { countWords, exportFileName } from "@/lib/export/shared";
 import type { Resume } from "@/lib/schemas";
 import { sampleResume } from "./fixtures";
@@ -117,6 +118,35 @@ describe("PDF export", () => {
     expect(text).toContain("Alex Doe");
     expect(text).toContain("Built things");
   }, 30_000);
+
+  it.each(["normal", "narrow", "wide"] as const)("keeps long titles clear of the dates, inside the %s margins", async (margins) => {
+    const r = sampleResume();
+    r.layout = { margins };
+    r.sections[0].items[0] = {
+      id: "long",
+      heading: "Data Engineer / Backend Developer at Petroliam Nasional Berhad (Contract), Group Digital",
+      subheading: "Technical Lead, CDF Integration · Backend Lead, OEIM Platform",
+      location: "Kuala Lumpur",
+      dates: "DEC 2025 – PRESENT",
+      bullets: [{ id: "b", text: "Built things" }],
+    };
+    const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    const doc = await pdfjs.getDocument({ data: new Uint8Array(await (await pdfOf(r)).arrayBuffer()) }).promise;
+    const page = await doc.getPage(1);
+    const pageWidth = page.getViewport({ scale: 1 }).width;
+    const items = (await page.getTextContent()).items.flatMap((i) => ("str" in i && i.str.trim() ? [{ str: i.str, x: i.transform[4], y: i.transform[5], w: i.width }] : []));
+    const meta = items.find((i) => i.str.includes("PRESENT"))!;
+    expect(meta).toBeDefined();
+    // The dates stay inside the right margin.
+    expect(meta.x + meta.w).toBeLessThanOrEqual(pageWidth - resolveLayout(r.layout).marginX + 1);
+    // Nothing on the dates' line runs into them.
+    const sameLine = items.filter((i) => i !== meta && Math.abs(i.y - meta.y) < 2);
+    for (const i of sameLine) expect(i.x + i.w).toBeLessThan(meta.x);
+    // The whole title is still there, wrapped onto more lines.
+    const { text } = await pdfText(await pdfOf(r));
+    // pdf.js joins wrapped lines without a space, so compare ignoring whitespace.
+    expect(text.replace(/\s+/g, "")).toContain("BackendLead,OEIMPlatform");
+  }, 30_000);
 });
 
 describe("Word export", () => {
@@ -145,6 +175,15 @@ describe("Word export", () => {
     expect(xml).toContain("<w:numPr>");
     expect(xml).toContain("<w:pageBreakBefore/>");
     expect(xml).toContain('w:ascii="Cambria"');
+  });
+
+  it.each(["normal", "narrow", "wide"] as const)("right-aligns the dates to the %s margin", async (margins) => {
+    const r = sampleResume();
+    r.layout = { margins };
+    const xml = await (await JSZip.loadAsync(await (await buildDocx(r)).arrayBuffer())).file("word/document.xml")!.async("string");
+    const spec = resolveLayout(r.layout);
+    const contentWidth = 11906 - 2 * Math.round(spec.marginX * 20); // A4 width in twentieths of a point
+    expect(xml).toContain(`<w:tab w:val="right" w:pos="${contentWidth}"/>`);
   });
 });
 
