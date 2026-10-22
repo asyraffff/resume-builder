@@ -22,15 +22,22 @@ export const contactLine = (r: Resume) =>
     .map((p) => p.text)
     .join("  |  ");
 
-/** "Senior Engineer, Acme" / "Acme" / "Senior Engineer", as formatted segments. */
-export function itemTitleSegments(it: Item): Segment[] {
+export type HeaderRow = { left: Segment[]; right: string; primary: boolean };
+
+/**
+ * An entry's header as up to two rows: the role in bold with the dates on the right, then the organisation
+ * with the location on the right. An entry with only one of heading/subheading gets a single bold row.
+ */
+export function itemHeaderRows(it: Item): HeaderRow[] {
   const head = parseInline(it.heading);
   const sub = parseInline(it.subheading);
-  if (head.length && sub.length) return [...head, { text: ", " }, ...sub];
-  return head.length ? head : sub;
+  const dates = it.dates.trim();
+  const location = it.location.trim();
+  const first: HeaderRow = { left: head.length ? head : sub, right: dates, primary: true };
+  const second: HeaderRow = { left: head.length ? sub : [], right: location, primary: false };
+  if (!second.left.length && second.right && !first.right) return [{ ...first, right: location }];
+  return [first, second].filter((r) => r.left.length || r.right);
 }
-export const itemTitle = (it: Item) => itemTitleSegments(it).map((s) => s.text).join("");
-export const itemMeta = (it: Item) => [it.location, it.dates].map((x) => x.trim()).filter(Boolean).join("  |  ");
 
 /** Skills read best as one line per group: "Languages: TypeScript, Python". */
 export const isInlineList = (s: Section) => s.type === "skills";

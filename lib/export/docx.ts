@@ -13,7 +13,7 @@ import {
 import type { Resume } from "../schemas";
 import { parseInline, type Segment } from "../inline";
 import { resolveLayout, type LayoutSpec } from "../layout";
-import { contactParts, isInlineList, itemMeta, itemTitleSegments, skillSegments, visibleSections } from "./shared";
+import { contactParts, isInlineList, itemHeaderRows, skillSegments, visibleSections } from "./shared";
 
 // Word substitutes fonts per character from the system, so standard Office fonts cover every language.
 const WORD_FONT = { sans: "Calibri", serif: "Cambria" } as const;
@@ -97,22 +97,20 @@ export async function buildDocx(r: Resume): Promise<Blob> {
         children.push(new Paragraph({ spacing: { after: twip(2), line }, children: runs(skillSegments(it), spec, spec.fontSize) }));
         continue;
       }
-      const title = itemTitleSegments(it);
-      const meta = itemMeta(it);
-      if (title.length || meta) {
+      itemHeaderRows(it).forEach((row, i) => {
         children.push(
           new Paragraph({
             keepNext: true,
-            spacing: { before: twip(spec.itemGap), line },
+            spacing: { before: twip(i === 0 ? spec.itemGap : 1), line },
             // Right edge of the text area for this resume's margins (TabStopPosition.MAX assumes 1-inch margins).
             tabStops: [{ type: TabStopType.RIGHT, position: A4_WIDTH - 2 * twip(spec.marginX) }],
             children: [
-              ...runs(title, spec, spec.fontSize, { bold: true }),
-              ...(meta ? [new TextRun({ text: `\t${meta}`, size: pt(spec.metaSize), font, color: "444444" })] : []),
+              ...runs(row.left, spec, spec.fontSize, row.primary ? { bold: true } : { color: "333333" }),
+              ...(row.right ? [new TextRun({ text: `\t${row.right}`, size: pt(spec.metaSize), font, color: "444444" })] : []),
             ],
           }),
         );
-      }
+      });
       for (const b of it.bullets) {
         if (!b.text.trim()) continue;
         children.push(

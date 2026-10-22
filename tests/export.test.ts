@@ -27,6 +27,14 @@ async function pdfText(blob: Blob) {
   return { text, pages: doc.numPages };
 }
 
+/** Text pieces on page 1 with their position (PDF points, y measured up from the bottom) and width. */
+async function positionedText(blob: Blob) {
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) }).promise;
+  const content = await (await doc.getPage(1)).getTextContent();
+  return content.items.flatMap((i) => ("str" in i && i.str.trim() ? [{ str: i.str.trim(), x: i.transform[4], y: i.transform[5], w: i.width }] : []));
+}
+
 async function pdfLinks(blob: Blob) {
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const doc = await pdfjs.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) }).promise;
@@ -55,7 +63,7 @@ describe("PDF export", () => {
     const r = sampleResume();
     r.sections.push({ id: "h", type: "custom", title: "Secret", hidden: true, items: [{ id: "hi", heading: "Hidden item", subheading: "", dates: "", location: "", bullets: [] }] });
     const { text } = await pdfText(await pdfOf(r));
-    for (const s of ["Alex Doe", "alex@example.com", "SUMMARY", "EXPERIENCE", "Software Engineer, Acme", "Built things", "Languages: TypeScript"]) {
+    for (const s of ["Alex Doe", "alex@example.com", "SUMMARY", "EXPERIENCE", "Software Engineer", "Acme", "Built things", "Languages: TypeScript"]) {
       expect(text).toContain(s);
     }
     expect(text.indexOf("EXPERIENCE")).toBeLessThan(text.indexOf("SKILLS"));
@@ -119,6 +127,33 @@ describe("PDF export", () => {
     expect(text).toContain("Built things");
   }, 30_000);
 
+  it.each(["classic", "modern", "compact"] as const)("leaves a gap between the name and the contact line (%s)", async (template) => {
+    const r = sampleResume();
+    r.layout = { template };
+    const items = await positionedText(await pdfOf(r));
+    const spec = resolveLayout(r.layout);
+    const name = items.find((i) => i.str.includes("Alex Doe"))!;
+    const contact = items.find((i) => i.str.includes("alex@example.com"))!;
+    // Bottom of the name's letters (descenders reach ~0.25 em below the baseline) stays above the top of the
+    // contact line's letters (~0.75 em above its baseline), with at least 2pt between them.
+    const nameBottom = name.y - 0.25 * spec.nameSize;
+    const contactTop = contact.y + 0.75 * spec.metaSize;
+    expect(nameBottom - contactTop).toBeGreaterThanOrEqual(2);
+  }, 30_000);
+
+  it("puts the role and the organisation on separate lines, with dates and location on the right", async () => {
+    const items = await positionedText(await pdfOf(sampleResume()));
+    const role = items.find((i) => i.str === "Software Engineer")!;
+    const org = items.find((i) => i.str === "Acme")!;
+    const dates = items.find((i) => i.str.includes("Present"))!;
+    const location = items.find((i) => i.str === "Remote" && i.y < role.y)!;
+    expect(org.y).toBeLessThan(role.y - 5); // organisation on the next line down
+    expect(Math.abs(org.x - role.x)).toBeLessThan(1); // left-aligned with the role
+    expect(Math.abs(dates.y - role.y)).toBeLessThan(2); // dates beside the role
+    expect(Math.abs(location.y - org.y)).toBeLessThan(2); // location beside the organisation
+    expect(Math.abs(location.x + location.w - (dates.x + dates.w))).toBeLessThan(1); // both right-aligned
+  }, 30_000);
+
   it.each(["normal", "narrow", "wide"] as const)("keeps long titles clear of the dates, inside the %s margins", async (margins) => {
     const r = sampleResume();
     r.layout = { margins };
@@ -153,7 +188,7 @@ describe("Word export", () => {
   it("round-trips through a Word parser", async () => {
     const blob = await buildDocx(sampleResume());
     const { value } = await mammoth.extractRawText({ buffer: Buffer.from(await blob.arrayBuffer()) });
-    for (const s of ["Alex Doe", "SUMMARY", "Software Engineer, Acme", "Built things", "Fixed bugs", "Languages: TypeScript"]) {
+    for (const s of ["Alex Doe", "SUMMARY", "Software Engineer", "Acme", "Built things", "Fixed bugs", "Languages: TypeScript"]) {
       expect(value).toContain(s);
     }
   });

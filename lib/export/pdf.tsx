@@ -3,7 +3,7 @@ import type { Resume } from "../schemas";
 import { parseInline, type Segment } from "../inline";
 import { MIN_FIT_SCALE, resolveLayout, type LayoutSpec } from "../layout";
 import { BASE_FONTS, SCRIPT_FONTS, scriptFallbacks } from "./fonts";
-import { contactParts, countPdfPages, exportText, isInlineList, itemMeta, itemTitleSegments, skillSegments, visibleSections } from "./shared";
+import { contactParts, countPdfPages, exportText, isInlineList, itemHeaderRows, skillSegments, visibleSections } from "./shared";
 
 /** Where font files are loaded from: the app's /fonts folder in the browser; tests pass a file-path resolver. */
 export type FontUrl = (file: string) => string;
@@ -41,8 +41,16 @@ function styles(spec: LayoutSpec, families: string[]) {
       lineHeight: spec.lineHeight,
       color: "#111111",
     },
-    name: { fontSize: spec.nameSize, fontWeight: 700, textAlign: spec.nameAlign, color: spec.template === "modern" ? spec.accent : "#111111" },
-    contact: { fontSize: spec.metaSize, textAlign: spec.nameAlign, marginTop: 3, color: "#333333" },
+    // Line heights set explicitly: an inherited line height is a fixed size taken from the body text, which is
+    // too short for the large name and made the contact line overlap it.
+    name: {
+      fontSize: spec.nameSize,
+      lineHeight: 1.2,
+      fontWeight: 700,
+      textAlign: spec.nameAlign,
+      color: spec.template === "modern" ? spec.accent : "#111111",
+    },
+    contact: { fontSize: spec.metaSize, lineHeight: spec.lineHeight, textAlign: spec.nameAlign, marginTop: 4, color: "#333333" },
     link: { color: "#1a4fbf", textDecoration: "none" },
     heading: {
       fontSize: spec.headingSize,
@@ -59,6 +67,8 @@ function styles(spec: LayoutSpec, families: string[]) {
     // The title takes whatever width the dates leave (basis 0), so long titles wrap instead of running under the
     // dates or pushing them past the margin. The dates keep their natural width, up to 45% of the line.
     itemTitle: { fontWeight: 700, flexGrow: 1, flexShrink: 1, flexBasis: 0, paddingRight: 10 },
+    itemSubRow: { marginTop: 1 },
+    itemSubtitle: { flexGrow: 1, flexShrink: 1, flexBasis: 0, paddingRight: 10, color: "#333333" },
     itemMeta: { fontSize: spec.metaSize, color: "#444444", flexShrink: 0, maxWidth: "45%", textAlign: "right", marginTop: 0.5 },
     bulletRow: { flexDirection: "row", marginTop: spec.bulletGap, paddingLeft: 6 },
     bulletDot: { width: 10 },
@@ -136,14 +146,14 @@ function ResumePdf({ r, spec, families }: { r: Resume; spec: LayoutSpec; familie
                 </Text>
               ) : (
                 <View key={it.id}>
-                  {itemTitleSegments(it).length || itemMeta(it) ? (
-                    <View style={s.itemRow} minPresenceAhead={24}>
-                      <Text style={s.itemTitle}>
-                        <Rich segments={itemTitleSegments(it)} s={s} />
+                  {itemHeaderRows(it).map((row, i) => (
+                    <View key={i} style={[s.itemRow, i > 0 ? s.itemSubRow : {}]} minPresenceAhead={24}>
+                      <Text style={row.primary ? s.itemTitle : s.itemSubtitle}>
+                        <Rich segments={row.left} s={s} />
                       </Text>
-                      <Text style={s.itemMeta}>{itemMeta(it)}</Text>
+                      {row.right ? <Text style={s.itemMeta}>{row.right}</Text> : null}
                     </View>
-                  ) : null}
+                  ))}
                   {it.bullets
                     .filter((b) => b.text.trim())
                     .map((b) => (
