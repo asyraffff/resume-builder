@@ -6,15 +6,14 @@ import { JobDescription, type ParseJdResult } from "@/lib/schemas";
 import { fetchJobDescription } from "@/lib/fetch-jd";
 import { screenJobDescription } from "@/lib/screen-jd";
 import { guardRequest } from "@/lib/guard";
+import { BodyTooLargeError, readForm } from "@/lib/body";
+import { MAX_REQUEST_BYTES, imageMediaType } from "@/lib/upload-checks";
 import { badRequest, errorResponse } from "@/lib/api-error";
 import { ndjsonStream } from "@/lib/stream-response";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"] as const;
-type ImageType = (typeof IMAGE_TYPES)[number];
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 /**
  * Reads a job description from pasted text, a link or screenshots. Input problems (and links that can't be read)
@@ -27,7 +26,7 @@ export async function POST(req: Request) {
   let rawText = "";
 
   try {
-    const form = await req.formData();
+    const form = await readForm(req, MAX_REQUEST_BYTES);
     const mode = String(form.get("mode") ?? "");
 
     if (mode === "text") {
@@ -48,18 +47,18 @@ export async function POST(req: Request) {
       if (files.length > 5) return badRequest("Up to 5 screenshots at a time.");
       content = [];
       for (const f of files) {
-        if (!IMAGE_TYPES.includes(f.type as ImageType)) return badRequest("Screenshots must be PNG, JPG, WebP or GIF.");
-        if (f.size > MAX_IMAGE_BYTES) return badRequest("Each screenshot must be under 5 MB.");
-        content.push({
-          type: "image",
-          source: { type: "base64", media_type: f.type as ImageType, data: Buffer.from(await f.arrayBuffer()).toString("base64") },
-        });
+        // The real image type comes from the bytes; a renamed file with the wrong contents is refused.
+        const bytes = Buffer.from(await f.arrayBuffer());
+        const mediaType = imageMediaType(bytes);
+        if (!mediaType) return badRequest("Screenshots must be PNG, JPG, WebP or GIF images.");
+        content.push({ type: "image", source: { type: "base64", media_type: mediaType, data: bytes.toString("base64") } });
       }
       content.push({ type: "text", text: "These screenshots show one job posting (possibly across several images). Extract it." });
     } else {
       return badRequest("Unknown input mode.");
     }
   } catch (err) {
+    if (err instanceof BodyTooLargeError) return badRequest("Those screenshots are too large together (4 MB limit). Use fewer or smaller images.", 413);
     return errorResponse(err);
   }
 

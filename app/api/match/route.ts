@@ -3,6 +3,7 @@ import { callStructuredStream } from "@/lib/claude";
 import { MATCH_SYSTEM } from "@/lib/prompts";
 import { JobDescription, MatchReport, Resume } from "@/lib/schemas";
 import { guardRequest } from "@/lib/guard";
+import { BodyTooLargeError, readJson } from "@/lib/body";
 import { badRequest } from "@/lib/api-error";
 import { ndjsonStream } from "@/lib/stream-response";
 import { pinOriginals } from "@/lib/apply-suggestion";
@@ -18,7 +19,15 @@ const Body = z.object({ resume: Resume, jd: JobDescription });
 export async function POST(req: Request) {
   const blocked = guardRequest(req, "match");
   if (blocked) return blocked;
-  const parsed = Body.safeParse(await req.json().catch(() => null));
+  // A resume plus job description is a few hundred KB at most.
+  let body: unknown;
+  try {
+    body = await readJson(req, 2 * 1024 * 1024);
+  } catch (err) {
+    if (err instanceof BodyTooLargeError) return badRequest("That resume is too large to analyse.", 413);
+    throw err;
+  }
+  const parsed = Body.safeParse(body);
   if (!parsed.success) return badRequest("Missing resume or job description.");
   const { resume, jd } = parsed.data;
 

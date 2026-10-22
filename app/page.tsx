@@ -34,8 +34,8 @@ export default function UploadPage() {
       setError("Please upload a PDF or Word (.docx) file.");
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setError("The file is larger than 5 MB.");
+    if (file.size > 4 * 1024 * 1024) {
+      setError("The file is larger than 4 MB.");
       return;
     }
     setUploadingName(file.name);
@@ -89,7 +89,7 @@ export default function UploadPage() {
           ) : (
             <>
               <p className="font-medium">{workspaces.length ? "Upload another resume" : "Drag and drop your resume here"}</p>
-              <p className="mt-1 text-sm text-muted">PDF or DOCX, up to 5 MB</p>
+              <p className="mt-1 text-sm text-muted">PDF or DOCX, up to 4 MB</p>
               <Button className="mt-5" onClick={() => inputRef.current?.click()}>
                 Choose file
               </Button>

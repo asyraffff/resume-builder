@@ -11,4 +11,4 @@ export function errorResponse(err: unknown) {
   return NextResponse.json({ error: "Something went wrong. Please try again." }, { status: 500 });
 }
 
-export const badRequest = (message: string) => NextResponse.json({ error: message }, { status: 400 });
+export const badRequest = (message: string, status = 400) => NextResponse.json({ error: message }, { status });

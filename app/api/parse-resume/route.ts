@@ -6,14 +6,14 @@ import { ParseResumeOutput, type AtsReport, type ParseResult } from "@/lib/schem
 import { withIds } from "@/lib/ids";
 import { mergeAts, runAtsChecks } from "@/lib/ats-checks";
 import { guardRequest } from "@/lib/guard";
+import { BodyTooLargeError, readForm } from "@/lib/body";
+import { MAX_REQUEST_BYTES, MAX_RESUME_TEXT_CHARS, checkResumeFile } from "@/lib/upload-checks";
 import { badRequest, errorResponse } from "@/lib/api-error";
 import { ndjsonStream } from "@/lib/stream-response";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-const MAX_BYTES = 5 * 1024 * 1024;
-const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 /** Validates the upload, then streams progress events and finally the parsed resume and ATS report. */
 export async function POST(req: Request) {
@@ -26,18 +26,17 @@ export async function POST(req: Request) {
 
   // Problems with the upload itself are answered with a plain JSON error before any streaming starts.
   try {
-    const form = await req.formData();
+    const form = await readForm(req, MAX_REQUEST_BYTES);
     const file = form.get("file");
     if (!(file instanceof File)) return badRequest("Please choose a file to upload.");
-    if (file.size > MAX_BYTES) return badRequest("The file is larger than 5 MB.");
 
-    const name = file.name.toLowerCase();
-    isPdf = file.type === "application/pdf" || name.endsWith(".pdf");
-    const isDocx = file.type === DOCX_MIME || name.endsWith(".docx");
-    if (!isPdf && !isDocx) return badRequest("Please upload a PDF or Word (.docx) file.");
-    fileName = file.name;
-
+    // Trust the file's bytes, not its name or the type the browser reported.
     const buf = Buffer.from(await file.arrayBuffer());
+    const check = checkResumeFile(buf);
+    if (!check.ok) return badRequest(check.error);
+    isPdf = check.kind === "pdf";
+    fileName = file.name.slice(0, 200);
+
     if (isPdf) {
       content = [
         { type: "document", source: { type: "base64", media_type: "application/pdf", data: buf.toString("base64") } },
@@ -46,9 +45,11 @@ export async function POST(req: Request) {
     } else {
       rawText = (await mammoth.extractRawText({ buffer: buf })).value;
       if (rawText.trim().length < 50) return badRequest("We couldn't read any text from that Word file.");
+      if (rawText.length > MAX_RESUME_TEXT_CHARS) return badRequest("That document is far too long to be a resume.");
       content = [{ type: "text", text: `Parse this resume and review its ATS-friendliness.\n\n<resume>\n${rawText}\n</resume>` }];
     }
   } catch (err) {
+    if (err instanceof BodyTooLargeError) return badRequest("The file is larger than 4 MB.", 413);
     return errorResponse(err);
   }
 

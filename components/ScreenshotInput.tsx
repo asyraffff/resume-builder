@@ -4,7 +4,33 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "reac
 
 const ACCEPTED = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 const MAX_IMAGES = 5;
-const MAX_BYTES = 5 * 1024 * 1024;
+/** Uploads must stay under the host's 4.5 MB request limit, so screenshots are shrunk and capped in total. */
+const MAX_TOTAL_BYTES = 4 * 1024 * 1024;
+const SHRINK_ABOVE_BYTES = 700 * 1024;
+const MAX_WIDTH = 1600; // wide enough to keep small text legible; very tall screenshots keep their full height
+
+/** Re-encodes a large screenshot as a smaller JPEG; returns the original if that doesn't help or fails. */
+async function shrink(file: File): Promise<File> {
+  if (file.size <= SHRINK_ABOVE_BYTES || file.type === "image/gif") return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, MAX_WIDTH / bitmap.width);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    ctx.fillStyle = "#fff"; // JPEG has no transparency
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.85));
+    if (!blob || blob.size >= file.size) return file;
+    return new File([blob], file.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" });
+  } catch {
+    return file;
+  }
+}
 
 export function isMac() {
   return typeof navigator !== "undefined" && /Mac|iPhone|iPad/i.test(navigator.userAgent);
@@ -33,24 +59,30 @@ export function ScreenshotInput({ images, onChange }: { images: File[]; onChange
     imagesRef.current = images;
   }, [images]);
 
-  function add(files: File[]) {
+  async function add(files: File[]) {
     setNotice(null);
     const problems: string[] = [];
-    const ok = files.filter((f) => {
-      if (!ACCEPTED.includes(f.type)) {
-        problems.push(`${f.name || "That file"} isn't a PNG, JPG, WebP or GIF.`);
-        return false;
-      }
-      if (f.size > MAX_BYTES) {
-        problems.push(`${f.name || "That image"} is larger than 5 MB.`);
-        return false;
-      }
-      return true;
+    const accepted = files.filter((f) => {
+      if (ACCEPTED.includes(f.type)) return true;
+      problems.push(`${f.name || "That file"} isn't a PNG, JPG, WebP or GIF.`);
+      return false;
     });
     const room = MAX_IMAGES - imagesRef.current.length;
-    if (ok.length > room) problems.push(`Only ${MAX_IMAGES} screenshots per job, so the extra ones weren't added.`);
+    if (accepted.length > room) problems.push(`Only ${MAX_IMAGES} screenshots per job, so the extra ones weren't added.`);
+    const shrunk = await Promise.all(accepted.slice(0, Math.max(0, room)).map(shrink));
+    // Keep adding while the total stays under the upload limit.
+    let total = imagesRef.current.reduce((n, f) => n + f.size, 0);
+    const fits: File[] = [];
+    for (const f of shrunk) {
+      if (total + f.size > MAX_TOTAL_BYTES) {
+        problems.push(`${f.name || "A screenshot"} would go over the 4 MB upload limit, so it wasn't added. Try a smaller crop.`);
+        continue;
+      }
+      total += f.size;
+      fits.push(f);
+    }
     if (problems.length) setNotice(problems.join(" "));
-    if (ok.length && room > 0) onChange([...imagesRef.current, ...ok.slice(0, room)]);
+    if (fits.length) onChange([...imagesRef.current, ...fits]);
   }
 
   // Ctrl/⌘+V anywhere on the page adds the screenshot while this tab is open.
