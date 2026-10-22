@@ -46,7 +46,7 @@ describe("resume file checks", () => {
     expect(bomb.length).toBeLessThan(200_000); // tiny on disk...
     expect(zipUncompressedSize(bomb)).toBeGreaterThan(MAX_DOCX_UNCOMPRESSED_BYTES); // ...huge when opened
     expect(checkResumeFile(bomb)).toMatchObject({ ok: false, error: expect.stringMatching(/too large to open safely/) });
-  });
+  }, 30_000); // building a 60 MB archive takes a few seconds when the whole suite runs in parallel
 
   it("reads zip directories without decompressing, and treats broken ones as unsafe", async () => {
     expect(zipEntries(await zip({ "a.txt": "aaaa", "b/c.txt": "c" }))?.map((e) => e.name).sort()).toEqual(["a.txt", "b/", "b/c.txt"]); // JSZip also records the folder
