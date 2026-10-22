@@ -15,6 +15,7 @@ import { placeholdersInResume } from "@/lib/placeholders";
 import { runAtsChecks } from "@/lib/ats-checks";
 import { AtsLiveCheck } from "@/components/AtsLiveCheck";
 import { CompareView } from "@/components/CompareView";
+import { FormatToolbar } from "@/components/editor/FormatToolbar";
 import { compareResumes } from "@/lib/diff";
 
 export default function EditorPage() {
@@ -193,6 +194,9 @@ export default function EditorPage() {
             <CompareView original={original} tailored={resume} />
           ) : (
             <div className="pl-7">
+              <div className="sticky top-16 z-10 mb-3 flex justify-center">
+                <FormatToolbar />
+              </div>
               <ResumeEditor highlight={highlight} />
             </div>
           )}

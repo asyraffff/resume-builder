@@ -105,3 +105,32 @@ export function plainResume(r: Resume): Resume {
     })),
   };
 }
+
+/**
+ * Maps a position in the displayed (formatted) text to the same position in the stored text with markers,
+ * so clicking into a bullet puts the cursor where the user clicked.
+ */
+export function rawOffset(text: string, plainOffset: number): number {
+  let plain = 0;
+  let last = 0;
+  for (const m of text.matchAll(TOKEN)) {
+    const i = m.index ?? 0;
+    const before = i - last;
+    // At a boundary, prefer inside the formatted text so typing there keeps the formatting.
+    if (plainOffset < plain + before) return last + (plainOffset - plain);
+    plain += before;
+    const isLink = m[1] !== undefined && safeHref(m[2]) !== null;
+    const inner = isLink ? m[1] : m[3] ?? m[4] ?? m[0];
+    const prefix = isLink ? 1 : m[3] !== undefined ? 2 : m[4] !== undefined ? 1 : 0;
+    if (m[1] !== undefined && !isLink) {
+      // An unsafe link is shown verbatim, so offsets map one-to-one.
+      if (plainOffset <= plain + m[0].length) return i + (plainOffset - plain);
+      plain += m[0].length;
+    } else {
+      if (plainOffset <= plain + inner.length) return i + prefix + (plainOffset - plain);
+      plain += inner.length;
+    }
+    last = i + m[0].length;
+  }
+  return Math.min(text.length, last + (plainOffset - plain));
+}

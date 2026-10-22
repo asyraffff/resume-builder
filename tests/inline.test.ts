@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contactHref, inlineToHtml, parseInline, plainText, safeHref, tidyUrl } from "@/lib/inline";
+import { contactHref, inlineToHtml, parseInline, plainText, rawOffset, safeHref, tidyUrl } from "@/lib/inline";
 import { findPlaceholders } from "@/lib/placeholders";
 import { keywordCoverage } from "@/lib/keywords";
 import { compareResumes } from "@/lib/diff";
@@ -83,5 +83,29 @@ describe("analysis ignores formatting", () => {
     const s = sug({ sectionId: "exp", itemId: "job1", bulletId: "b1", original: "Built Kafka pipelines for Acme" });
     expect(currentTextFor(formatted(), s)).toBe("Built Kafka pipelines for Acme");
     expect(isStale(formatted(), s)).toBe(false);
+  });
+});
+
+describe("rawOffset", () => {
+  const t = "Led **big** move to [Acme](https://a.co) now";
+  it.each([
+    [0, 0], // start
+    [4, 6], // start of "big" inside **
+    [7, 9], // end of "big"
+    [8, 12], // after the bold text: "m" of "move"
+    [16, 21], // start of link text "Acme"
+    [17, 22], // "c" inside the link text
+    [plainText(t).length, t.length],
+  ])("maps plain offset %i to raw offset %i", (plain, raw) => {
+    expect(rawOffset(t, plain)).toBe(raw);
+  });
+
+  it("points at the same character for every position inside plain runs and formatted text", () => {
+    const plain = plainText(t);
+    for (let i = 0; i < plain.length; i++) {
+      const raw = rawOffset(t, i);
+      // The character at the mapped position is the same one, except at a boundary where it lands on a marker.
+      if (!"*[](".includes(t[raw])) expect(t[raw]).toBe(plain[i]);
+    }
   });
 });

@@ -9,6 +9,7 @@ import { DragHandle, SortableList, SortableRow } from "./Sortable";
 import { AddSection, DEFAULT_TITLES, emptyItem } from "./AddSection";
 import { SkillsItem } from "./SkillsItem";
 import { DeleteButton, ToolButton } from "./controls";
+import { tidyUrl } from "@/lib/inline";
 
 export function ResumeEditor({ highlight }: { highlight?: Set<string> }) {
   const resume = useResumeStore((s) => s.resume);
@@ -70,6 +71,8 @@ export function ResumeEditor({ highlight }: { highlight?: Set<string> }) {
                 value={l}
                 placeholder="link"
                 onChange={(v) => set((r) => ({ ...r, contact: { ...r.contact, links: r.contact.links.map((x, j) => (j === i ? v : x)) } }), `link.${i}`)}
+                // Tidy when done typing: "https://www.linkedin.com/in/x/?trk=…" -> "linkedin.com/in/x".
+                onCommit={(v) => set((r) => ({ ...r, contact: { ...r.contact, links: r.contact.links.map((x, j) => (j === i ? tidyUrl(v) : x)) } }), `link.${i}`)}
                 onBackspaceEmpty={() => set((r) => ({ ...r, contact: { ...r.contact, links: r.contact.links.filter((_, j) => j !== i) } }))}
               />
               <DeleteButton
@@ -96,6 +99,7 @@ export function ResumeEditor({ highlight }: { highlight?: Set<string> }) {
         <InlineEditable
           as="p"
           multiline
+          rich
           value={resume.summary}
           onChange={(v) => set((r) => ({ ...r, summary: v }), "summary")}
           placeholder="A 2–3 sentence professional summary tailored to the role"
@@ -170,6 +174,7 @@ export function ResumeEditor({ highlight }: { highlight?: Set<string> }) {
                                             <span className="select-none pt-px" aria-hidden>•</span>
                                             <InlineEditable
                                               multiline
+                                              rich
                                               autoFocus={focusId === b.id}
                                               value={b.text}
                                               placeholder="Describe an achievement…"
