@@ -34,8 +34,12 @@ test("shows the server's message when a limit is reached", async ({ page }) => {
   await expect(page.getByRole("alert").filter({ hasText: "limit" })).toContainText("reached the limit for uploads");
 });
 
-test("privacy page is linked from every page", async ({ page }) => {
-  await page.goto("/");
+test("privacy page is linked from every page, and security headers are sent", async ({ page }) => {
+  const res = await page.goto("/");
+  const headers = res!.headers();
+  expect(headers["x-frame-options"]).toBe("DENY");
+  expect(headers["x-content-type-options"]).toBe("nosniff");
+  expect(headers["x-powered-by"]).toBeUndefined();
   await page.getByRole("link", { name: "Privacy", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Privacy", level: 1 })).toBeVisible();
   await expect(page.getByText("Anthropic's privacy policy")).toBeVisible();

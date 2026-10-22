@@ -15,9 +15,11 @@ npm run dev                  # http://localhost:3000
 | Command | What it does |
 | --- | --- |
 | `npm run dev` | Dev server |
-| `npm test` | Unit tests (ATS checks, suggestion patches, JD fetching, PDF/DOCX export) |
+| `npm test` | Unit tests (ATS checks, suggestion patches, JD fetching, upload checks, rate limits, PDF/DOCX export) |
+| `npm run test:e2e` | End-to-end tests in a real browser against a production build on port 3200. AI responses are replayed from `tests/e2e/fixtures.ts`, so no API key or credits are needed. First time: `npx playwright install chromium` |
 | `npm run typecheck` | TypeScript check |
-| `npm run build` | Production build (includes lint) |
+| `npm run lint` | ESLint |
+| `npm run build` | Production build |
 
 ## How it works
 
@@ -37,6 +39,22 @@ All Claude calls go through `lib/claude.ts`: Sonnet 5.5 reads resumes and job po
 
 Everything is stored in this browser (localStorage, about 5 MB). Use **Back up all** on the Upload page to download every resume, job and tailored version as one JSON file, and **Restore from backup** to load it again, e.g. in another browser. The format is versioned (`lib/backup.ts`) so older backups keep importing. If storage fills up, a banner warns that changes aren't being saved.
 
+Nothing is stored on the server. Resumes and job descriptions pass through to Claude for analysis and are never logged. Visitors acknowledge this once before their first upload, the `/privacy` page explains it in full, and **Delete all my data** in the footer wipes everything from the browser.
+
+## Deploying to Vercel
+
+1. Push the repository to GitHub and import it at [vercel.com/new](https://vercel.com/new). The framework is detected automatically, and no `vercel.json` is needed.
+2. Under **Settings → Environment Variables**, add the variables from `.env.example`: `ANTHROPIC_API_KEY` (required), plus `APP_ACCESS_CODE`, `AI_DAILY_LIMIT` and `NEXT_PUBLIC_CONTACT_EMAIL` if you want them.
+3. Deploy. Before sharing the link, set a monthly spend limit for the API key in the Anthropic Console.
+
+Things to know:
+
+- **Function duration.** Matching can take a few minutes, so `/api/match` sets `maxDuration = 300` and the reading routes set 120. This needs Fluid compute, which is on by default for new projects.
+- **Upload size.** Vercel caps request bodies at 4.5 MB. The app caps uploads at 4.4 MB, resumes at 4 MB, and shrinks large screenshots in the browser before sending them.
+- **Rate limits** (`lib/rate-limit.ts`) are held in memory, per server instance. They stop casual abuse and runaway loops but reset when an instance restarts, and each instance counts separately. The Anthropic spend limit is the real backstop. Moving the counters to a shared store (Upstash Redis, for example) only means replacing `MemoryStore`. The visitor is identified by `x-forwarded-for`, which Vercel sets to the real client IP. Behind another proxy, check that it does the same.
+- **Access code.** Setting `APP_ACCESS_CODE` turns the site into a private beta: visitors are asked for the code once and it's remembered in their browser.
+- **Security headers** (no framing, no MIME sniffing, a strict referrer policy) are set in `next.config.ts`.
+
 ## Known audit findings
 
 `npm audit` still lists two issues that don't affect the running app and have no fixed version upstream:
@@ -48,4 +66,4 @@ Everything is stored in this browser (localStorage, about 5 MB). Use **Back up a
 
 ## Not in the MVP yet
 
-Accounts and a database, alternative templates, cover letters, and rate limiting.
+Accounts and a database (sync across devices), cover letters, error monitoring, and shared rate-limit storage.
