@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { Layout } from "./layout";
 
 // ---------- Resume (canonical, with IDs) ----------
 
@@ -42,6 +43,8 @@ export const Resume = z.object({
   contact: Contact,
   summary: z.string(),
   sections: z.array(Section),
+  /** Page layout for export; absent means the defaults. */
+  layout: Layout.optional(),
 });
 
 export type Bullet = z.infer<typeof Bullet>;

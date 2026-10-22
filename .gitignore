@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# PDF fonts, copied from node_modules by scripts/copy-fonts.mjs
+/public/fonts/

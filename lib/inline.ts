@@ -90,7 +90,9 @@ export function contactHref(value: string): string | null {
 }
 
 /** A copy of the resume with formatting markers removed, for analysis (AI, ATS checks, keywords, comparisons). */
-export function plainResume(r: Resume): Resume {
+export function plainResume(formatted: Resume): Resume {
+  // Layout only affects how the page looks, so it's left out of analysis (and out of what's sent to the AI).
+  const r = { contact: formatted.contact, summary: formatted.summary, sections: formatted.sections };
   return {
     ...r,
     summary: plainText(r.summary),

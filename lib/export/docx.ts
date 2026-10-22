@@ -2,66 +2,124 @@ import {
   AlignmentType,
   BorderStyle,
   Document,
+  ExternalHyperlink,
+  LevelFormat,
   Packer,
   Paragraph,
   TabStopPosition,
   TabStopType,
   TextRun,
+  type ParagraphChild,
 } from "docx";
 import type { Resume } from "../schemas";
-import { contactLine, isInlineList, itemMeta, itemTitle, skillLine, visibleSections } from "./shared";
+import { parseInline, type Segment } from "../inline";
+import { resolveLayout, type LayoutSpec } from "../layout";
+import { contactParts, isInlineList, itemMeta, itemTitleSegments, skillSegments, visibleSections } from "./shared";
 
-const FONT = "Calibri";
+// Word substitutes fonts per character from the system, so standard Office fonts cover every language.
+const WORD_FONT = { sans: "Calibri", serif: "Cambria" } as const;
 
-const heading = (text: string) =>
-  new Paragraph({
-    spacing: { before: 240, after: 80 },
-    border: { bottom: { color: "999999", space: 1, style: BorderStyle.SINGLE, size: 6 } },
-    children: [new TextRun({ text: text.toUpperCase(), bold: true, size: 22, font: FONT })],
+const pt = (n: number) => Math.round(n * 2); // docx sizes are half-points
+const twip = (n: number) => Math.round(n * 20); // spacing and margins are twentieths of a point
+
+function runs(segments: Segment[], spec: LayoutSpec, size: number, extra: { bold?: boolean; color?: string } = {}): ParagraphChild[] {
+  const font = WORD_FONT[spec.font];
+  return segments.map((s) => {
+    const run = new TextRun({
+      text: s.text,
+      bold: extra.bold || s.bold,
+      italics: s.italic,
+      size: pt(size),
+      font,
+      color: s.href ? "1A4FBF" : extra.color,
+    });
+    return s.href ? new ExternalHyperlink({ link: s.href, children: [run] }) : run;
   });
+}
+
+function heading(text: string, spec: LayoutSpec, pageBreakBefore = false) {
+  return new Paragraph({
+    pageBreakBefore,
+    keepNext: true,
+    spacing: { before: twip(spec.sectionGap), after: twip(3) },
+    border: spec.headingRule ? { bottom: { color: "9A9A9A", space: 1, style: BorderStyle.SINGLE, size: 6 } } : undefined,
+    children: [
+      new TextRun({
+        text: text.toUpperCase(),
+        bold: true,
+        size: pt(spec.headingSize),
+        font: WORD_FONT[spec.font],
+        color: spec.accent.replace("#", ""),
+        characterSpacing: spec.template === "modern" ? 16 : 6,
+      }),
+    ],
+  });
+}
 
 export async function buildDocx(r: Resume): Promise<Blob> {
+  const spec = resolveLayout(r.layout);
+  const font = WORD_FONT[spec.font];
+  const line = Math.round(240 * spec.lineHeight * 0.9); // Word's "single" already includes some leading
+  const align = spec.nameAlign === "center" ? AlignmentType.CENTER : AlignmentType.LEFT;
+
+  const contact = contactParts(r).flatMap((p, i): ParagraphChild[] => {
+    const sep = i > 0 ? [new TextRun({ text: "  |  ", size: pt(spec.metaSize), font, color: "333333" })] : [];
+    const run = new TextRun({ text: p.text, size: pt(spec.metaSize), font, color: p.href ? "1A4FBF" : "333333" });
+    return [...sep, p.href ? new ExternalHyperlink({ link: p.href, children: [run] }) : run];
+  });
+
   const children: Paragraph[] = [
     new Paragraph({
-      alignment: AlignmentType.CENTER,
-      children: [new TextRun({ text: r.contact.name, bold: true, size: 36, font: FONT })],
+      alignment: align,
+      children: [
+        new TextRun({
+          text: r.contact.name,
+          bold: true,
+          size: pt(spec.nameSize),
+          font,
+          color: spec.template === "modern" ? spec.accent.replace("#", "") : undefined,
+        }),
+      ],
     }),
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 120 },
-      children: [new TextRun({ text: contactLine(r), size: 19, font: FONT })],
-    }),
+    new Paragraph({ alignment: align, spacing: { before: twip(3) }, children: contact }),
   ];
 
   if (r.summary.trim()) {
-    children.push(heading("Summary"));
-    children.push(new Paragraph({ children: [new TextRun({ text: r.summary, size: 20, font: FONT })] }));
+    children.push(heading("Summary", spec));
+    children.push(new Paragraph({ spacing: { line }, children: runs(parseInline(r.summary), spec, spec.fontSize) }));
   }
 
   for (const s of visibleSections(r)) {
-    children.push(heading(s.title));
+    children.push(heading(s.title, spec, spec.pageBreakBefore.has(s.id)));
     for (const it of s.items) {
       if (isInlineList(s)) {
-        children.push(new Paragraph({ spacing: { after: 40 }, children: [new TextRun({ text: skillLine(it), size: 20, font: FONT })] }));
+        children.push(new Paragraph({ spacing: { after: twip(2), line }, children: runs(skillSegments(it), spec, spec.fontSize) }));
         continue;
       }
-      const title = itemTitle(it);
+      const title = itemTitleSegments(it);
       const meta = itemMeta(it);
-      if (title || meta) {
+      if (title.length || meta) {
         children.push(
           new Paragraph({
-            spacing: { before: 100 },
+            keepNext: true,
+            spacing: { before: twip(spec.itemGap), line },
             tabStops: [{ type: TabStopType.RIGHT, position: TabStopPosition.MAX }],
             children: [
-              new TextRun({ text: title, bold: true, size: 20, font: FONT }),
-              ...(meta ? [new TextRun({ text: `\t${meta}`, size: 19, font: FONT })] : []),
+              ...runs(title, spec, spec.fontSize, { bold: true }),
+              ...(meta ? [new TextRun({ text: `\t${meta}`, size: pt(spec.metaSize), font, color: "444444" })] : []),
             ],
           }),
         );
       }
       for (const b of it.bullets) {
         if (!b.text.trim()) continue;
-        children.push(new Paragraph({ bullet: { level: 0 }, children: [new TextRun({ text: b.text, size: 20, font: FONT })] }));
+        children.push(
+          new Paragraph({
+            numbering: { reference: "bullets", level: 0 },
+            spacing: { before: twip(spec.bulletGap), line },
+            children: runs(parseInline(b.text), spec, spec.fontSize),
+          }),
+        );
       }
     }
   }
@@ -69,7 +127,22 @@ export async function buildDocx(r: Resume): Promise<Blob> {
   const doc = new Document({
     creator: r.contact.name || "Resume",
     title: `${r.contact.name} Resume`,
-    sections: [{ properties: { page: { margin: { top: 720, bottom: 720, left: 864, right: 864 } } }, children }],
+    // A plain bullet list Word recognises as a real list (better for ATS than typed "•" characters).
+    numbering: {
+      config: [
+        {
+          reference: "bullets",
+          levels: [{ level: 0, format: LevelFormat.BULLET, text: "•", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 360, hanging: 240 } } } }],
+        },
+      ],
+    },
+    styles: { default: { document: { run: { font, size: pt(spec.fontSize) } } } },
+    sections: [
+      {
+        properties: { page: { margin: { top: twip(spec.marginY), bottom: twip(spec.marginY), left: twip(spec.marginX), right: twip(spec.marginX) } } },
+        children,
+      },
+    ],
   });
   return Packer.toBlob(doc);
 }
