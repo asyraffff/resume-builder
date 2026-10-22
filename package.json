@@ -28,6 +28,13 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@expo-google-fonts/noto-sans": "^0.4.2",
+    "@expo-google-fonts/noto-sans-arabic": "^0.4.3",
+    "@expo-google-fonts/noto-sans-devanagari": "^0.4.1",
+    "@expo-google-fonts/noto-sans-sc": "^0.4.4",
+    "@expo-google-fonts/noto-sans-tamil": "^0.4.3",
+    "@expo-google-fonts/noto-sans-thai": "^0.4.2",
+    "@expo-google-fonts/noto-serif": "^0.4.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",

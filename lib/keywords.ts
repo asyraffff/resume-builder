@@ -1,4 +1,5 @@
 import type { JobDescription, MatchReport, Resume } from "./schemas";
+import { plainResume } from "./inline";
 
 /**
  * Deterministic keyword coverage: the same resume and job always give the same result,
@@ -68,7 +69,8 @@ function variants(keyword: string): string[] {
 }
 
 /** All visible resume text that recruiters and ATS systems search. Contact details are excluded. */
-export function resumeText(r: Resume): string {
+export function resumeText(resume: Resume): string {
+  const r = plainResume(resume);
   const parts = [r.summary];
   for (const s of r.sections) {
     if (s.hidden) continue;

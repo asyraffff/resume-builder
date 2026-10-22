@@ -1,5 +1,6 @@
 import type { Resume, Section, Suggestion } from "./schemas";
 import { newId } from "./ids";
+import { plainResume } from "./inline";
 
 /** Returns a new resume with the suggestion applied, or null if its target no longer exists. */
 export function applySuggestion(resume: Resume, s: Suggestion, proposedOverride?: string): Resume | null {
@@ -72,7 +73,9 @@ export function reorderSections(resume: Resume, order: string[]): Resume {
  * The resume text a suggestion replaces or removes, as it is now, or null for suggestions that only add
  * something (new bullets, skills) or whose target no longer exists.
  */
-export function currentTextFor(resume: Resume, s: Suggestion): string | null {
+export function currentTextFor(formatted: Resume, s: Suggestion): string | null {
+  // Suggestions are made from plain text, so compare and display plain text.
+  const resume = plainResume(formatted);
   if (s.target === "summary") return resume.summary;
   const section = resume.sections.find((sec) => sec.id === s.sectionId);
   if (!section) return null;

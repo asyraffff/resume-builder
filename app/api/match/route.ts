@@ -6,6 +6,7 @@ import { badRequest } from "@/lib/api-error";
 import { ndjsonStream } from "@/lib/stream-response";
 import { pinOriginals } from "@/lib/apply-suggestion";
 import { sanitiseReport } from "@/lib/sanitise-report";
+import { plainResume } from "@/lib/inline";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -19,7 +20,8 @@ export async function POST(req: Request) {
   const { resume, jd } = parsed.data;
 
   // Hidden sections are excluded from the export, so don't optimise them.
-  const visible = { ...resume, sections: resume.sections.filter((s) => !s.hidden) };
+  // The AI works on plain text: formatting markers would only confuse its suggestions.
+  const visible = plainResume({ ...resume, sections: resume.sections.filter((s) => !s.hidden) });
   const sectionIds = new Set(visible.sections.map((s) => s.id));
 
   return ndjsonStream(

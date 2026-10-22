@@ -2,7 +2,8 @@ import type { Resume } from "./schemas";
 
 // Matches AI placeholders such as "[% reduction in runtime]" or "[X%]". Real bracketed text in a resume is rare, and a false
 // positive only causes a warning, never a change.
-const PLACEHOLDER = /\[[^\[\]\n]{1,80}\]/g;
+// A bracket followed by "(" is a [text](link), not a placeholder.
+const PLACEHOLDER = /\[[^\[\]\n]{1,80}\](?!\()/g;
 
 export function findPlaceholders(text: string): string[] {
   return [...new Set(text.match(PLACEHOLDER) ?? [])];

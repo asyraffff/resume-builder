@@ -1,4 +1,5 @@
 import type { Item, Resume, Section } from "./schemas";
+import { plainResume } from "./inline";
 
 /** Before/after comparison of two versions of a resume, matched by section, entry and bullet ids. */
 
@@ -98,7 +99,10 @@ function diffItems(before: Section | undefined, after: Section | undefined): Ite
   return out;
 }
 
-export function compareResumes(original: Resume, tailored: Resume): ResumeDiff {
+export function compareResumes(originalFormatted: Resume, tailoredFormatted: Resume): ResumeDiff {
+  // Compare wording; formatting-only changes (bold, links) aren't counted as edits.
+  const original = plainResume(originalFormatted);
+  const tailored = plainResume(tailoredFormatted);
   const prev = new Map(original.sections.map((s) => [s.id, s]));
   const sections: SectionDiff[] = [];
   for (const s of tailored.sections) {

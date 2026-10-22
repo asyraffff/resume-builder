@@ -1,5 +1,6 @@
 import type { AtsIssue, Resume } from "./schemas";
 import { placeholdersInResume } from "./placeholders";
+import { plainResume } from "./inline";
 import { detectInjection } from "./injection";
 
 const STANDARD_HEADINGS = [
@@ -47,7 +48,9 @@ export type RuleIssue = AtsIssue & { topic: RegExp };
  * Deterministic ATS checks. Used at upload (with the file type and raw text) and live in the editor
  * on whatever version is on screen (no context needed).
  */
-export function runAtsChecks(resume: Resume, ctx: { fileType?: "pdf" | "docx"; rawText?: string } = {}): RuleIssue[] {
+export function runAtsChecks(formatted: Resume, ctx: { fileType?: "pdf" | "docx"; rawText?: string } = {}): RuleIssue[] {
+  // Check the words a recruiter reads, not formatting markers like **bold** or [text](link).
+  const resume = plainResume(formatted);
   const issues: RuleIssue[] = [];
   const { contact } = resume;
 
