@@ -70,6 +70,10 @@ export default function PrivacyPage() {
             control costs). It isn&apos;t written to disk and is forgotten within a day.
           </li>
           <li>Our hosting provider may keep standard request logs (such as time, page and IP address) under its own policies.</li>
+          <li>
+            <strong>Page-speed measurements</strong> (Vercel Speed Insights): how quickly pages load, with the page address, browser and
+            device type. No cookies, nothing that identifies you, and never anything you typed or uploaded.
+          </li>
         </ul>
       </Section>
 

@@ -5,6 +5,7 @@ import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import { SiteFooter } from "@/components/SiteFooter";
 import { DialogHost } from "@/components/dialog";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 export const metadata: Metadata = {
   title: "Resume Tailor",
@@ -22,6 +23,8 @@ export default function RootLayout({
         <div className="flex-1">{children}</div>
         <SiteFooter />
         <DialogHost />
+        {/* Anonymous page-load timings for the Vercel dashboard; it only reports when deployed on Vercel. */}
+        <SpeedInsights />
       </body>
     </html>
   );

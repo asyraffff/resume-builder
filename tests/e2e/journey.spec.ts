@@ -72,6 +72,8 @@ test("adding a link from the formatting toolbar", async ({ page }) => {
   const dialog = page.getByRole("dialog", { name: "Add a link" });
   await dialog.getByLabel("Web address or email").fill("react.dev");
   await dialog.getByRole("button", { name: "Add link" }).click();
+  // The link is inserted once the field has focus again; wait for it before leaving the field.
+  await expect(page.getByText("[React](https://react.dev)")).toBeVisible();
   await page.keyboard.press("Escape"); // leave the field so it shows the formatted text
   await expect(page.getByRole("link", { name: "React", exact: true })).toHaveAttribute("href", "https://react.dev");
 });
