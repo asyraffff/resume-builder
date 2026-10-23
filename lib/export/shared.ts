@@ -24,13 +24,21 @@ export const contactLine = (r: Resume) =>
 
 export type HeaderRow = { left: Segment[]; right: string; primary: boolean };
 
+/** "Technical Lead, OCR Pipeline:" reads as a lead-in in the editor but looks stray as a header line. */
+function withoutTrailingColon(segments: Segment[]): Segment[] {
+  const last = segments.at(-1);
+  if (!last || !/:\s*$/.test(last.text)) return segments;
+  const text = last.text.replace(/\s*:\s*$/, "");
+  return text ? [...segments.slice(0, -1), { ...last, text }] : segments.slice(0, -1);
+}
+
 /**
  * An entry's header as up to two rows: the role in bold with the dates on the right, then the organisation
  * with the location on the right. An entry with only one of heading/subheading gets a single bold row.
  */
 export function itemHeaderRows(it: Item): HeaderRow[] {
-  const head = parseInline(it.heading);
-  const sub = parseInline(it.subheading);
+  const head = withoutTrailingColon(parseInline(it.heading));
+  const sub = withoutTrailingColon(parseInline(it.subheading));
   const dates = it.dates.trim();
   const location = it.location.trim();
   const first: HeaderRow = { left: head.length ? head : sub, right: dates, primary: true };

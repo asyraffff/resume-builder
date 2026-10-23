@@ -24,6 +24,36 @@ describe("runAtsChecks", () => {
     expect(titles).toContain("Non-standard section headings");
   });
 
+  it.each([
+    "Professional Experience",
+    "Education and Certifications",
+    "Education & Certifications",
+    "Core Competencies",
+    "Skills / Tools",
+    "Licenses, Certifications and Training",
+    "WORK HISTORY:",
+    "Relevant Projects",
+    "Honors and Awards",
+  ])("accepts the common heading %j", (title) => {
+    const r = sampleResume();
+    r.sections[0].title = title;
+    expect(runAtsChecks(r, { fileType: "pdf" }).map((i) => i.title)).not.toContain("Non-standard section headings");
+  });
+
+  it.each(["My Journey", "Stuff I Did", "Experience and Hobbies Corner", "Where I've Been"])("still flags the creative heading %j", (title) => {
+    const r = sampleResume();
+    r.sections[0].title = title;
+    expect(runAtsChecks(r, { fileType: "pdf" }).map((i) => i.title)).toContain("Non-standard section headings");
+  });
+
+  it("points out two sections with the same heading", () => {
+    const r = sampleResume();
+    r.sections[1].title = "Experience";
+    const issue = runAtsChecks(r, { fileType: "pdf" }).find((i) => i.title === "Two sections share a heading");
+    expect(issue?.severity).toBe("low");
+    expect(issue?.detail).toContain('"Experience"');
+  });
+
   it("flags an unreadable (empty) resume", () => {
     const r = sampleResume();
     r.sections = [];

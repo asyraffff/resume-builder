@@ -3,30 +3,31 @@ import { placeholdersInResume } from "./placeholders";
 import { plainResume } from "./inline";
 import { detectInjection } from "./injection";
 
-const STANDARD_HEADINGS = [
-  "experience",
-  "work experience",
-  "professional experience",
-  "employment",
-  "employment history",
-  "education",
-  "skills",
-  "technical skills",
-  "core skills",
-  "projects",
-  "certifications",
-  "certificates",
-  "summary",
-  "professional summary",
-  "profile",
-  "awards",
-  "publications",
-  "languages",
-  "volunteer",
-  "volunteering",
-  "leadership",
-  "achievements",
-];
+/**
+ * Words ATS systems recognise as section names. A heading counts as standard when every part of it (split on
+ * "and", "&", "/" or commas) is made of these, ignoring filler words: "Education and Certifications",
+ * "Core Competencies" and "Professional Experience" pass; "My Journey" doesn't.
+ */
+const SECTION_WORDS = new Set(
+  (
+    "experience employment work history career education academic qualifications background skills skill competencies " +
+    "competency expertise technologies tools stack projects project certifications certification certificates licenses " +
+    "licences courses coursework training summary profile objective about awards honors honours achievements " +
+    "accomplishments publications languages volunteer volunteering leadership interests hobbies references activities " +
+    "affiliations memberships research portfolio contact information"
+  ).split(" "),
+);
+const FILLER_WORDS = new Set("professional relevant key core technical selected additional other me my of".split(" "));
+
+export function isStandardHeading(title: string): boolean {
+  const parts = title
+    .toLowerCase()
+    .replace(/[^a-z&/,\s]/g, " ")
+    .split(/\s+and\s+|[&/,]/)
+    .map((p) => p.split(/\s+/).filter((w) => w && !FILLER_WORDS.has(w)))
+    .filter((words) => words.length);
+  return parts.length > 0 && parts.every((words) => words.every((w) => SECTION_WORDS.has(w)));
+}
 
 const MONTH_YEAR = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+\d{4}\b/i;
 const NUMERIC_DATE = /\b\d{1,2}\/\d{2,4}\b/;
@@ -87,9 +88,7 @@ export function runAtsChecks(formatted: Resume, ctx: { fileType?: "pdf" | "docx"
     });
   }
 
-  const nonStandard = resume.sections.filter(
-    (s) => !STANDARD_HEADINGS.includes(s.title.trim().toLowerCase().replace(/[:&]/g, "").replace(/\s+/g, " ")),
-  );
+  const nonStandard = resume.sections.filter((s) => !isStandardHeading(s.title));
   if (nonStandard.length > 0) {
     issues.push({
       severity: "medium",
@@ -97,6 +96,24 @@ export function runAtsChecks(formatted: Resume, ctx: { fileType?: "pdf" | "docx"
       topic: /heading/i,
       detail: `ATS systems look for common headings. Found: ${nonStandard.map((s) => `"${s.title}"`).join(", ")}.`,
       fix: "Use standard headings such as Experience, Education, Skills, Projects, Certifications.",
+    });
+  }
+
+  const seen = new Map<string, string>();
+  const repeated = new Set<string>();
+  for (const sec of resume.sections) {
+    const key = sec.title.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    if (!key) continue;
+    if (seen.has(key)) repeated.add(seen.get(key)!);
+    else seen.set(key, sec.title.trim());
+  }
+  if (repeated.size > 0) {
+    issues.push({
+      severity: "low",
+      title: "Two sections share a heading",
+      topic: /heading/i,
+      detail: `Found more than once: ${[...repeated].map((t) => `"${t}"`).join(", ")}. An ATS may merge them or keep only one.`,
+      fix: "Merge them into one section, or rename one (for example, Education and Certifications).",
     });
   }
 

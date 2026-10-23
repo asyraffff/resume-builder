@@ -6,7 +6,7 @@ import { buildDocx } from "@/lib/export/docx";
 import { buildPdf, renderPdf } from "@/lib/export/pdf";
 import { fontPackage, scriptFallbacks } from "@/lib/export/fonts";
 import { resolveLayout } from "@/lib/layout";
-import { countWords, exportFileName } from "@/lib/export/shared";
+import { countWords, exportFileName, itemHeaderRows } from "@/lib/export/shared";
 import type { Resume } from "@/lib/schemas";
 import { sampleResume } from "./fixtures";
 
@@ -219,6 +219,21 @@ describe("Word export", () => {
     const spec = resolveLayout(r.layout);
     const contentWidth = 11906 - 2 * Math.round(spec.marginX * 20); // A4 width in twentieths of a point
     expect(xml).toContain(`<w:tab w:val="right" w:pos="${contentWidth}"/>`);
+  });
+});
+
+describe("entry headers", () => {
+  it("drop a trailing colon from the role or organisation line", () => {
+    const rows = itemHeaderRows({
+      id: "i",
+      heading: "Data Engineer",
+      subheading: "PETRONAS | Upstream Digital · Technical Lead, **OCR Pipeline**:",
+      dates: "2024",
+      location: "",
+      bullets: [],
+    });
+    expect(rows[1].left.map((s) => s.text).join("")).toBe("PETRONAS | Upstream Digital · Technical Lead, OCR Pipeline");
+    expect(rows[1].left.at(-1)).toMatchObject({ text: "OCR Pipeline", bold: true }); // formatting kept
   });
 });
 
