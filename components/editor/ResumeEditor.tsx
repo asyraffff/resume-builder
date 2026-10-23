@@ -122,7 +122,7 @@ export function ResumeEditor({ highlight }: { highlight?: Set<string> }) {
                     className="text-[13px] font-bold uppercase tracking-wide"
                   />
                   {sec.hidden && <span className="text-xs text-muted">(hidden from export)</span>}
-                  <div className="ml-auto flex gap-1 opacity-0 transition group-hover/section:opacity-100 focus-within:opacity-100">
+                  <div className="ml-auto flex gap-1 opacity-0 transition group-hover/section:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100">
                     <ToolButton onClick={() => setSection(sec.id, (s) => ({ ...s, items: [...s.items, emptyItem()] }))}>+ entry</ToolButton>
                     <ToolButton onClick={() => setSection(sec.id, (s) => ({ ...s, hidden: !s.hidden }))}>{sec.hidden ? "Show" : "Hide"}</ToolButton>
                   </div>
@@ -167,10 +167,10 @@ export function ResumeEditor({ highlight }: { highlight?: Set<string> }) {
                                 <SortableList items={it.bullets} onReorder={(bullets) => setItem(sec.id, it.id, (x) => ({ ...x, bullets }))}>
                                   <ul className="mt-0.5">
                                     {it.bullets.map((b, bi) => (
-                                      <SortableRow key={b.id} id={b.id} className="group/bullet">
+                                      <SortableRow key={b.id} id={b.id} as="li" className="group/bullet">
                                         {(bh) => (
-                                          <li className={`-ml-1 flex items-start gap-1 rounded ${highlight?.has(b.id) ? "bg-green-50" : ""}`}>
-                                            <span className="opacity-0 group-hover/bullet:opacity-100"><DragHandle handle={bh} label="Reorder bullet" /></span>
+                                          <div className={`-ml-1 flex items-start gap-1 rounded ${highlight?.has(b.id) ? "bg-green-50" : ""}`}>
+                                            <span className="opacity-0 group-hover/bullet:opacity-100 [@media(hover:none)]:opacity-100"><DragHandle handle={bh} label="Reorder bullet" /></span>
                                             <span className="select-none pt-px" aria-hidden>•</span>
                                             <InlineEditable
                                               multiline
@@ -196,14 +196,14 @@ export function ResumeEditor({ highlight }: { highlight?: Set<string> }) {
                                               }}
                                             />
                                             <DeleteButton reveal="bullet" size="sm" label="Delete bullet" className="mt-0.5" onClick={() => removeBullet(sec.id, it.id, b.id, "Bullet deleted")} />
-                                          </li>
+                                          </div>
                                         )}
                                       </SortableRow>
                                     ))}
                                   </ul>
                                 </SortableList>
                                 <button
-                                  className="ml-6 text-xs text-accent opacity-0 hover:underline group-hover/item:opacity-100 focus:opacity-100"
+                                  className="ml-6 text-xs text-accent opacity-0 hover:underline group-hover/item:opacity-100 focus:opacity-100 [@media(hover:none)]:opacity-100 [@media(pointer:coarse)]:py-2"
                                   onClick={() => {
                                     const id = newId();
                                     setItem(sec.id, it.id, (x) => ({ ...x, bullets: [...x.bullets, { id, text: "" }] }));

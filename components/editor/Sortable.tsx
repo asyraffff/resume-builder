@@ -55,22 +55,25 @@ export type HandleProps = ReturnType<typeof useSortable>["listeners"] & ReturnTy
 
 export function SortableRow({
   id,
+  as: Tag = "div",
   className = "",
   children,
 }: {
   id: string;
+  /** "li" when the row is an item of a list, so the list's markup stays valid for screen readers. */
+  as?: "div" | "li";
   className?: string;
   children: (handle: HandleProps, isDragging: boolean) => ReactNode;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   return (
-    <div
+    <Tag
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition, zIndex: isDragging ? 10 : undefined, position: "relative" }}
       className={`${className} ${isDragging ? "opacity-80 shadow-lg" : ""}`}
     >
       {children({ ...attributes, ...listeners } as HandleProps, isDragging)}
-    </div>
+    </Tag>
   );
 }
 
@@ -81,7 +84,7 @@ export function DragHandle({ handle, label }: { handle: HandleProps; label: stri
       type="button"
       aria-label={label}
       title="Drag to reorder"
-      className="flex h-6 w-5 shrink-0 cursor-grab touch-none items-center justify-center rounded text-muted/60 hover:bg-background hover:text-foreground active:cursor-grabbing"
+      className="relative [@media(pointer:coarse)]:after:absolute [@media(pointer:coarse)]:after:-inset-2.5 [@media(pointer:coarse)]:after:content-[''] flex h-6 w-5 shrink-0 cursor-grab touch-none items-center justify-center rounded text-muted/60 hover:bg-background hover:text-foreground active:cursor-grabbing"
     >
       <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" aria-hidden>
         {[2, 7, 12].flatMap((y) => [<circle key={`a${y}`} cx="2.5" cy={y} r="1.3" />, <circle key={`b${y}`} cx="7.5" cy={y} r="1.3" />])}

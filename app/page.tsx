@@ -134,7 +134,7 @@ export default function UploadPage() {
                   <span>
                     I understand my resume will be sent to Anthropic&apos;s Claude AI to be analysed. It isn&apos;t stored on this
                     site&apos;s server, and my saved work stays in this browser.{" "}
-                    <Link href="/privacy" className="text-accent hover:underline" target="_blank">
+                    <Link href="/privacy" className="text-accent underline underline-offset-2" target="_blank">
                       Privacy details
                     </Link>
                   </span>

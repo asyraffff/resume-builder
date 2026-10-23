@@ -40,11 +40,11 @@ export default function PrivacyPage() {
         <p>
           Anthropic processes this data to provide the analysis, under its commercial terms. By default, Anthropic doesn&apos;t use data
           sent through its API to train its models, and may keep it for a limited period for safety and abuse monitoring. See{" "}
-          <a className="text-accent hover:underline" href="https://www.anthropic.com/legal/privacy" target="_blank" rel="noopener noreferrer">
+          <a className="text-accent underline underline-offset-2" href="https://www.anthropic.com/legal/privacy" target="_blank" rel="noopener noreferrer">
             Anthropic&apos;s privacy policy
           </a>{" "}
           and{" "}
-          <a className="text-accent hover:underline" href="https://www.anthropic.com/legal/commercial-terms" target="_blank" rel="noopener noreferrer">
+          <a className="text-accent underline underline-offset-2" href="https://www.anthropic.com/legal/commercial-terms" target="_blank" rel="noopener noreferrer">
             commercial terms
           </a>{" "}
           for details.
@@ -91,7 +91,7 @@ export default function PrivacyPage() {
           {contact ? (
             <>
               Questions about privacy? Email{" "}
-              <a className="text-accent hover:underline" href={`mailto:${contact}`}>
+              <a className="text-accent underline underline-offset-2" href={`mailto:${contact}`}>
                 {contact}
               </a>
               .

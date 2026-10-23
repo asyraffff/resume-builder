@@ -26,20 +26,21 @@ export function Header({ step, right }: { step: Step; right?: ReactNode }) {
   const onSample = useResumeStore((s) => hydrated && selectWorkspaces(s).find((w) => w.id === s.activeWorkspaceId)?.fileName === SAMPLE_FILE_NAME);
   return (
     <header className="sticky top-0 z-20 border-b border-border bg-surface/90 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-7xl items-center gap-3 px-4 sm:gap-5">
+      {/* On phones the steps get their own row under the logo and actions, so nothing overlaps. */}
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 sm:h-14 sm:flex-nowrap sm:gap-5 sm:py-0">
         <Link href="/" className="shrink-0 font-semibold tracking-tight">
           Resume<span className="text-accent">Tailor</span>
         </Link>
-        <nav className="flex min-w-0 items-center gap-0.5 text-sm" aria-label="Steps">
+        <nav className="order-last flex w-full min-w-0 items-center gap-0.5 text-sm sm:order-none sm:w-auto" aria-label="Steps">
           {STEPS.map((s, i) => {
             const current = i === step;
             const base = "whitespace-nowrap rounded-md px-2 py-1 transition";
             const label = (
               <>
                 <span className="tabular-nums">{i + 1}</span>
-                <span className="hidden sm:inline">. </span>
+                <span>. </span>
                 <span className="hidden lg:inline">{s.label}</span>
-                <span className="hidden sm:inline lg:hidden">{s.short}</span>
+                <span className="lg:hidden">{s.short}</span>
               </>
             );
             return (
@@ -63,9 +64,9 @@ export function Header({ step, right }: { step: Step; right?: ReactNode }) {
       </div>
       {onSample && (
         <div className="border-t border-border bg-accent-soft/60 px-4 py-2 text-center text-sm">
-          You&apos;re exploring a sample resume (Alex Rivera is made up). Accepting suggestions, editing and exporting are free;
-          adding a job or re-checking the match uses AI.{" "}
-          <Link href="/" className="font-medium text-accent hover:underline">
+          You&apos;re exploring a sample resume<span className="hidden sm:inline"> (Alex Rivera is made up). Accepting suggestions, editing and exporting are free;
+          adding a job or re-checking the match uses AI</span>.{" "}
+          <Link href="/" className="font-medium text-accent underline underline-offset-2">
             Upload your own
           </Link>
         </div>

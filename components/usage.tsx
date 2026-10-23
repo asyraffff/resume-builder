@@ -221,7 +221,7 @@ export function UsageChip() {
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        aria-haspopup="dialog"
+        aria-controls="usage-breakdown"
         className={`flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs hover:bg-background ${tone}`}
         title={`${label}. Click for details.`}
         aria-label={`${label}. Your AI usage`}
@@ -234,7 +234,7 @@ export function UsageChip() {
         <span className="tabular-nums xl:hidden">{busy ? "Paused" : m.remaining}</span>
       </button>
       {open && (
-        <div role="dialog" aria-label="Your AI usage" className="absolute right-0 top-full z-30 mt-2 w-72 rounded-xl border border-border bg-surface p-4 text-sm shadow-lg">
+        <div id="usage-breakdown" role="region" aria-label="Your AI usage" className="absolute right-0 top-full z-30 mt-2 w-72 rounded-xl border border-border bg-surface p-4 text-sm shadow-lg">
           <p className="font-medium">Your AI usage</p>
           {busy ? (
             <p className="mt-2 text-muted">

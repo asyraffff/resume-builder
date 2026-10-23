@@ -127,9 +127,13 @@ export default function EditorPage() {
         }
       />
       <main className="mx-auto grid max-w-7xl gap-6 px-4 py-6 lg:grid-cols-[380px_1fr]">
-        <aside className="h-fit rounded-xl border border-border bg-surface lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
+        <aside id="suggestions" className="h-fit scroll-mt-28 rounded-xl border border-border bg-surface lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
           <div className="sticky top-0 z-10 border-b border-border bg-surface p-3">
             <JobSwitcher />
+            {/* On phones the resume comes after all of this; let people jump straight to it. */}
+            <a href="#resume" className="mt-2 block text-center text-sm text-accent hover:underline lg:hidden">
+              Jump to your resume ↓
+            </a>
           </div>
           <div className="p-4">
             <div className="mb-5">
@@ -178,8 +182,11 @@ export default function EditorPage() {
           </div>
         </aside>
 
-        <section className="min-w-0">
+        <section id="resume" className="min-w-0 scroll-mt-28">
           {error && <div className="mb-4"><ErrorNote>{error}</ErrorNote></div>}
+          <a href="#suggestions" className="mb-2 inline-block text-sm text-accent hover:underline lg:hidden">
+            ↑ Back to suggestions
+          </a>
           <div className="mb-3 flex flex-wrap items-center gap-3">
             <div className="flex gap-1 rounded-lg bg-surface p-1 ring-1 ring-border" role="tablist" aria-label="View">
               {(
@@ -217,9 +224,18 @@ export default function EditorPage() {
             <CompareView original={original} tailored={resume} />
           ) : (
             <div className="pl-7">
-              <div className="sticky top-16 z-10 mb-3 flex flex-wrap items-center justify-center gap-2">
+              <div className="z-10 mb-3 flex flex-wrap items-center justify-center gap-2 sm:sticky sm:top-16">
                 <FormatToolbar />
                 <PageMeter resume={resume} />
+                {/* The header's Undo/Redo only fit on wide screens. */}
+                <div className="flex gap-1 lg:hidden">
+                  <Button variant="secondary" size="sm" onClick={undo} disabled={!past.length} aria-label="Undo">
+                    ↶
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={redo} disabled={!future.length} aria-label="Redo">
+                    ↷
+                  </Button>
+                </div>
               </div>
               <ResumeEditor highlight={highlight} />
             </div>

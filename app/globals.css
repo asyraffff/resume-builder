@@ -9,7 +9,7 @@
   --accent: #2f5bea;
   --accent-soft: #e9eefe;
   --good: #1f8a4c;
-  --warn: #b7791f;
+  --warn: #975a16; /* 5.4:1 on amber-50, meets WCAG AA for text */
   --bad: #c53030;
 }
 
@@ -50,4 +50,11 @@ body {
 .editable:empty::before {
   content: attr(data-placeholder);
   color: #a0a7b4;
+}
+
+/* A clear focus ring on form fields (many set outline-none and only tint their border). */
+input:not([type="checkbox"]):not([type="radio"]):focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
 }

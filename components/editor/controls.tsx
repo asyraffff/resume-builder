@@ -41,7 +41,7 @@ export function DeleteButton({
       onClick={onClick}
       aria-label={label}
       title={label}
-      className={`inline-flex shrink-0 items-center justify-center rounded text-neutral-400 opacity-0 transition hover:bg-red-50 hover:text-bad focus-visible:opacity-100 [@media(hover:none)]:opacity-60 ${REVEAL[reveal]} ${box} ${className}`}
+      className={`relative [@media(pointer:coarse)]:after:absolute [@media(pointer:coarse)]:after:-inset-2.5 [@media(pointer:coarse)]:after:content-[''] inline-flex shrink-0 items-center justify-center rounded text-neutral-400 opacity-0 transition hover:bg-red-50 hover:text-bad focus-visible:opacity-100 [@media(hover:none)]:opacity-60 ${REVEAL[reveal]} ${box} ${className}`}
     >
       <svg width={icon} height={icon} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         <path d="M2.5 4h11M6.5 4V2.5h3V4M4 4l.7 9.5h6.6L12 4M6.75 7v4M9.25 7v4" />

@@ -47,7 +47,7 @@ test("the usage meter counts requests as they happen", async ({ page }) => {
   await mockAi(page);
   await uploadSample(page);
   await page.getByRole("button", { name: /8 matches left/ }).click();
-  const panel = page.getByRole("dialog", { name: "Your AI usage" });
+  const panel = page.getByRole("region", { name: "Your AI usage" });
   await expect(panel).toContainText("1 of 6 used");
   await expect(panel).toContainText("None used · 8 per 10 minutes");
 });
@@ -56,7 +56,7 @@ test("usage chip shows what's left, with a breakdown", async ({ page }) => {
   await seedUsage(page, { hits: { match: [-2, -1] } });
   await page.goto("/");
   await page.getByRole("button", { name: /6 matches left/ }).click();
-  const panel = page.getByRole("dialog", { name: "Your AI usage" });
+  const panel = page.getByRole("region", { name: "Your AI usage" });
   await expect(panel).toContainText("6 left");
   await expect(panel).toContainText("2 of 8 used · next frees up in 8 min");
   await expect(panel).toContainText("None used · 15 per 10 minutes");

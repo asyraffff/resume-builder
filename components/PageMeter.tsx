@@ -39,7 +39,7 @@ export function PageMeter({ resume }: { resume: Resume }) {
       className="flex items-center gap-2 rounded-lg bg-surface px-2.5 py-1.5 text-xs ring-1 ring-border"
       title="Pages are measured from the exported PDF. Most recruiters expect one page early in a career and two at most."
     >
-      <span className={`font-medium tabular-nums ${tone} ${stale ? "opacity-60" : ""}`}>
+      <span className={`font-medium tabular-nums ${stale ? "text-muted" : tone}`}>
         {pages === undefined ? "… pages" : `${pages} page${pages > 1 ? "s" : ""}`}
       </span>
       <span className="text-border" aria-hidden>
