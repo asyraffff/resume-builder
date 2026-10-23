@@ -4,6 +4,8 @@
  * with a shared one (e.g. Upstash Redis) that implements the same `hit` method.
  */
 
+import type { RouteUsage, Usage } from "./usage";
+
 export type Window = { limit: number; windowMs: number };
 export type Rule = { name: string; windows: Window[] };
 
@@ -45,6 +47,15 @@ class MemoryStore {
     return { ok: true };
   }
 
+  /** Read-only: how many hits fall in each window, and when the oldest of them expires. */
+  peek(key: string, windows: Window[], now = Date.now()): { used: number; freesInMs: number | null }[] {
+    const times = this.hits.get(key) ?? [];
+    return windows.map((w) => {
+      const inWindow = times.filter((t) => now - t < w.windowMs);
+      return { used: inWindow.length, freesInMs: inWindow.length ? w.windowMs - (now - inWindow[0]) : null };
+    });
+  }
+
   reset() {
     this.hits.clear();
   }
@@ -52,12 +63,47 @@ class MemoryStore {
 
 export const store = new MemoryStore();
 
+const globalWindows = () => [{ limit: globalDailyLimit(), windowMs: DAY }];
+
 export function checkRateLimit(route: RouteName, visitor: string, now = Date.now()): Decision {
+  // Check the app-wide limit first without recording, so a request it blocks doesn't use up the visitor's allowance.
+  const [global] = store.peek("global", globalWindows(), now);
+  if (global.used >= globalDailyLimit()) return { ok: false, retryAfterSec: Math.ceil((global.freesInMs ?? DAY) / 1000), reason: "global" };
   const visitorResult = store.hit(`${route}:${visitor}`, RULES[route].windows, now);
   if (!visitorResult.ok) return { ok: false, retryAfterSec: Math.ceil(visitorResult.retryAfterMs / 1000), reason: "visitor" };
-  const globalResult = store.hit("global", [{ limit: globalDailyLimit(), windowMs: DAY }], now);
-  if (!globalResult.ok) return { ok: false, retryAfterSec: Math.ceil(globalResult.retryAfterMs / 1000), reason: "global" };
+  store.hit("global", globalWindows(), now);
   return { ok: true };
+}
+
+/** What `visitor` may still do on each route, for the usage meter. Doesn't count as a request. */
+export function usageFor(visitor: string, now = Date.now()): Usage {
+  const [global] = store.peek("global", globalWindows(), now);
+  const globalLeft = Math.max(0, globalDailyLimit() - global.used);
+  const secs = (ms: number | null) => (ms === null ? null : Math.ceil(ms / 1000));
+
+  const routes = Object.fromEntries(
+    (Object.keys(RULES) as RouteName[]).map((route) => {
+      const windows = RULES[route].windows;
+      const stats = store.peek(`${route}:${visitor}`, windows, now);
+      // The tightest window decides; on a tie the shorter one, since it refills sooner.
+      let i = 0;
+      stats.forEach((s, k) => {
+        if (windows[k].limit - s.used < windows[i].limit - stats[i].used) i = k;
+      });
+      const own = windows[i].limit - stats[i].used;
+      const cappedByGlobal = globalLeft < own;
+      const usage: RouteUsage = {
+        remaining: Math.max(0, Math.min(own, globalLeft)),
+        limit: windows[i].limit,
+        window: windows[i].windowMs === DAY ? "day" : "10 minutes",
+        daily: windows.find((w) => w.windowMs === DAY)?.limit ?? windows[i].limit,
+        nextFreeInSec: secs(cappedByGlobal ? global.freesInMs : stats[i].freesInMs),
+      };
+      return [route, usage];
+    }),
+  ) as Usage["routes"];
+
+  return { routes, busy: globalLeft === 0 ? { resetInSec: secs(global.freesInMs) ?? 0 } : null };
 }
 
 /** The visitor's IP as reported by the hosting platform (Vercel sets x-forwarded-for; the first entry is the client). */

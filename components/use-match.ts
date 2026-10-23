@@ -4,7 +4,7 @@ import { useState } from "react";
 import { selectJobs, useResumeStore } from "@/store/resume-store";
 import type { MatchReport } from "@/lib/schemas";
 import type { Progress } from "@/lib/stream-progress";
-import { runStream } from "./stream-client";
+import { LimitReachedError, runStream } from "./stream-client";
 
 /** Runs a match for any job (not just the one on screen) and tracks live progress and errors per job. */
 export function useMatchRunner() {
@@ -27,7 +27,9 @@ export function useMatchRunner() {
       setReportFor(jobId, report);
       return true;
     } catch (e) {
-      setErrors((x) => ({ ...x, [jobId]: e instanceof Error ? e.message : "Matching failed." }));
+      // A reached limit is shown by the usage meter's "try again at…" card, not as an error.
+      const message = e instanceof LimitReachedError ? "" : e instanceof Error ? e.message : "Matching failed.";
+      setErrors((x) => ({ ...x, [jobId]: message }));
       return false;
     } finally {
       update(undefined);

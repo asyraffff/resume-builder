@@ -6,7 +6,8 @@ import type { JobDescription } from "@/lib/schemas";
 import type { Progress } from "@/lib/stream-progress";
 import type { ParseJdResult } from "@/lib/schemas";
 import { ScreenshotInput, imagesFrom } from "./ScreenshotInput";
-import { StreamRequestError, runStream } from "./stream-client";
+import { LimitReachedError, StreamRequestError, runStream } from "./stream-client";
+import { LimitCard, UsageHint } from "./usage";
 import { TaskProgressBar } from "./TaskProgressBar";
 
 type Mode = "text" | "url" | "image";
@@ -49,6 +50,7 @@ export function JdInput({
         setMode("text");
         return;
       }
+      if (e instanceof LimitReachedError) return; // the usage card below explains when to try again
       setError(e instanceof Error ? e.message : "Couldn't read the job description.");
     } finally {
       setProgress(null);
@@ -125,6 +127,7 @@ export function JdInput({
       </div>
 
       {error && <div className="mt-3"><ErrorNote>{error}</ErrorNote></div>}
+      <LimitCard route="parse-jd" className="mt-3" />
 
       {progress ? (
         <div className="mt-4 rounded-lg bg-accent-soft/50 p-3">
@@ -135,6 +138,8 @@ export function JdInput({
           {submitLabel}
         </Button>
       )}
+      <UsageHint route="parse-jd" className="mt-2 block text-center" />
+      <UsageHint route="match" className="mt-1 block text-center" />
       {mode === "text" && text.trim().length > 0 && text.trim().length < 100 && (
         <p className="mt-2 text-xs text-muted">Paste a bit more: at least a few sentences.</p>
       )}

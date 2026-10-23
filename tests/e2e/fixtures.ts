@@ -134,3 +134,16 @@ export async function uploadSample(page: Page) {
   await page.locator('input[type="file"][accept*="pdf"]').setInputFiles(samplePdf);
   await page.waitForURL("**/ats");
 }
+
+type RouteUsage = { remaining: number; limit: number; window: string; daily: number; nextFreeInSec: number | null };
+const fullUsage: Record<string, RouteUsage> = {
+  match: { remaining: 8, limit: 8, window: "10 minutes", daily: 50, nextFreeInSec: null },
+  "parse-jd": { remaining: 15, limit: 15, window: "10 minutes", daily: 80, nextFreeInSec: null },
+  "parse-resume": { remaining: 6, limit: 6, window: "10 minutes", daily: 30, nextFreeInSec: null },
+};
+
+/** A usage snapshot like /api/usage returns, with some routes changed. */
+export function usageWith(changes: Record<string, Partial<RouteUsage>>) {
+  const routes = Object.fromEntries(Object.entries(fullUsage).map(([k, v]) => [k, { ...v, ...changes[k] }]));
+  return { routes, busy: null as { resetInSec: number } | null };
+}

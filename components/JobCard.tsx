@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { TaskProgressBar } from "./TaskProgressBar";
 import { Badge, Button, Card, ErrorNote, ScoreRing, Spinner } from "./ui";
+import { LimitCard, UsageHint } from "./usage";
 import type { Progress } from "@/lib/stream-progress";
 import { jobLabel, type Job } from "@/store/resume-store";
 import { liveScore } from "@/lib/keywords";
@@ -123,12 +124,14 @@ export function JobCard({
         </div>
       )}
       {error && <div className="mt-3"><ErrorNote>{error}</ErrorNote></div>}
+      <LimitCard route="match" className="mt-3" />
 
       <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-4">
         <Button size="sm" onClick={onOpen}>Tailor resume →</Button>
         <Button size="sm" variant="secondary" onClick={onMatch} disabled={running}>
           {job.report ? "Re-run match" : error ? "Retry match" : "Run match"}
         </Button>
+        <UsageHint route="match" />
         {job.report && (
           <span className="text-xs text-muted">
             {accepted} of {job.report.suggestions.length} suggestions applied

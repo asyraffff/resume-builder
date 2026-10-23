@@ -2,6 +2,7 @@
 
 import { giveConsent, hasConsent } from "@/lib/privacy";
 import { confirmDialog, promptDialog } from "./dialog";
+import { refreshUsage, setUsage } from "./usage";
 import { applyEvent, startProgress, type Progress, type Stats, type StreamEvent, type Task } from "@/lib/stream-progress";
 
 const statsKey = (task: Task) => `resume-tailor-${task}-stats`;
@@ -49,6 +50,9 @@ export class StreamRequestError extends Error {
     super(message);
   }
 }
+
+/** A usage limit was reached. The page shows a "try again at…" card from the usage meter instead of an error. */
+export class LimitReachedError extends StreamRequestError {}
 
 export function loadStats(task: Task): Stats {
   try {
@@ -117,16 +121,24 @@ export async function runStream<D>(task: Task, url: string, init: RequestInit, o
   // Validation errors and rate limits come back as plain JSON before any streaming starts.
   if (!res.ok || !res.body) {
     const data = await res.json().catch(() => ({}));
+    if (res.status === 429 && data.limitReached) {
+      if (data.usage) setUsage(data.usage);
+      throw new LimitReachedError(data.error ?? "Limit reached.", data);
+    }
     throw new StreamRequestError(data.error ?? "Request failed.", data);
   }
-  for await (const e of readEvents<D>(res)) {
-    if (e.type === "error") throw new Error(e.message);
-    if (e.type === "done") {
-      recordStats(task, Date.now() - started, current.chars);
-      return e.data;
+  try {
+    for await (const e of readEvents<D>(res)) {
+      if (e.type === "error") throw new Error(e.message);
+      if (e.type === "done") {
+        recordStats(task, Date.now() - started, current.chars);
+        return e.data;
+      }
+      current = applyEvent(current, e, Date.now());
+      onProgress(current);
     }
-    current = applyEvent(current, e, Date.now());
-    onProgress(current);
+    throw new Error("The connection closed before it finished. Please retry.");
+  } finally {
+    void refreshUsage(); // this request counted, so update the usage meter
   }
-  throw new Error("The connection closed before it finished. Please retry.");
 }

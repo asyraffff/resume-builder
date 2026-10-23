@@ -12,6 +12,7 @@ import { Header, StepNav } from "@/components/navigation";
 import { useHydrated, useResumeStore } from "@/store/resume-store";
 import { downloadBlob, exportFileName } from "@/lib/export/shared";
 import { confirmDialog } from "@/components/dialog";
+import { LimitCard, UsageHint } from "@/components/usage";
 import { placeholdersInResume } from "@/lib/placeholders";
 import { runAtsChecks } from "@/lib/ats-checks";
 import { AtsLiveCheck } from "@/components/AtsLiveCheck";
@@ -145,9 +146,11 @@ export default function EditorPage() {
                   <SuggestionsPanel />
                 )}
                 {rescoreError && <div className="mt-4"><ErrorNote>{rescoreError}</ErrorNote></div>}
+                <LimitCard route="match" className="mt-4" />
                 <Button variant="secondary" size="sm" className="mt-5 w-full" onClick={() => match.run(activeJobId)} disabled={rescoring}>
                   {rescoring ? <><Spinner /> Re-checking…</> : report ? "Re-check score with my edits" : "Run match for this job"}
                 </Button>
+                <UsageHint route="match" className="mt-2 block text-center" />
               </>
             ) : (
               <div className="space-y-3 text-sm text-muted">

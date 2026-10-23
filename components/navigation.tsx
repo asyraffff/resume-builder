@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { useHydrated, useResumeStore, useSaveFailed } from "@/store/resume-store";
 import { Button, LinkButton } from "./ui";
+import { UsageChip } from "./usage";
 
 export const STEPS = [
   { href: "/", label: "Upload", short: "Upload" },
@@ -53,7 +54,10 @@ export function Header({ step, right }: { step: Step; right?: ReactNode }) {
             );
           })}
         </nav>
-        <div className="ml-auto flex shrink-0 items-center gap-2">{right}</div>
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <UsageChip />
+          {right}
+        </div>
       </div>
       {saveFailed && (
         <div role="alert" className="border-t border-red-200 bg-red-50 px-4 py-2 text-center text-sm text-bad">

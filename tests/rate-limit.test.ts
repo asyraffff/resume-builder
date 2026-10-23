@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { RULES, checkRateLimit, retryText, store, visitorId } from "@/lib/rate-limit";
+import { RULES, checkRateLimit, retryText, store, usageFor, visitorId } from "@/lib/rate-limit";
 import { guardRequest } from "@/lib/guard";
 
 const req = (headers: Record<string, string> = {}) => new Request("http://localhost/api/match", { method: "POST", headers });
@@ -54,6 +54,50 @@ describe("rate limits", () => {
   });
 });
 
+describe("usage meter", () => {
+  it("reports a fresh visitor's full allowance without counting as a request", () => {
+    const u = usageFor("new");
+    expect(u.busy).toBeNull();
+    expect(u.routes.match).toEqual({ remaining: 8, limit: 8, window: "10 minutes", daily: 50, nextFreeInSec: null });
+    expect(usageFor("new").routes.match.remaining).toBe(8);
+  });
+
+  it("counts down and says when the next request frees up", () => {
+    const t0 = 5_000_000;
+    checkRateLimit("match", "v", t0);
+    checkRateLimit("match", "v", t0 + 60_000);
+    const m = usageFor("v", t0 + 120_000).routes.match;
+    expect(m.remaining).toBe(6);
+    expect(m.nextFreeInSec).toBe(8 * 60); // the first match was 2 minutes ago in a 10-minute window
+    expect(usageFor("v", t0 + 120_000).routes["parse-jd"].remaining).toBe(15); // other routes untouched
+  });
+
+  it("switches to the daily window when that is the tighter one", () => {
+    const [short, day] = RULES.match.windows;
+    let t = 0;
+    for (let i = 0; i < day.limit - 2; i++, t += short.windowMs) checkRateLimit("match", "d", t);
+    expect(usageFor("d", t).routes.match).toMatchObject({ remaining: 2, limit: day.limit, window: "day" });
+  });
+
+  it("caps everyone by the app-wide limit and flags it as busy", () => {
+    process.env.AI_DAILY_LIMIT = "2";
+    checkRateLimit("match", "a", 0);
+    expect(usageFor("b", 1).routes.match.remaining).toBe(1);
+    checkRateLimit("parse-jd", "a", 1);
+    const u = usageFor("b", 2);
+    expect(u.routes.match.remaining).toBe(0);
+    expect(u.busy).not.toBeNull();
+  });
+
+  it("doesn't use up a visitor's allowance on requests the app-wide limit blocks", () => {
+    process.env.AI_DAILY_LIMIT = "1";
+    checkRateLimit("match", "a", 0);
+    expect(checkRateLimit("match", "b", 1)).toMatchObject({ ok: false, reason: "global" });
+    delete process.env.AI_DAILY_LIMIT;
+    expect(usageFor("b", 2).routes.match.remaining).toBe(8);
+  });
+});
+
 describe("request guard", () => {
   it("returns 429 with Retry-After when the limit is reached", async () => {
     const { limit } = RULES.match.windows[0];
@@ -61,7 +105,10 @@ describe("request guard", () => {
     const res = guardRequest(req({ "x-forwarded-for": "9.9.9.9" }), "match")!;
     expect(res.status).toBe(429);
     expect(Number(res.headers.get("Retry-After"))).toBeGreaterThan(0);
-    expect((await res.json()).error).toMatch(/limit for matches/);
+    const body = await res.json();
+    expect(body.error).toMatch(/limit for matches/);
+    expect(body.limitReached).toBe(true);
+    expect(body.usage.routes.match.remaining).toBe(0);
   });
 
   it("requires the access code only when one is configured", async () => {

@@ -10,7 +10,8 @@ import { ResumeRow } from "@/components/ResumeRow";
 import { TaskProgressBar } from "@/components/TaskProgressBar";
 import { BackupControls } from "@/components/BackupControls";
 import { confirmDialog } from "@/components/dialog";
-import { runStream } from "@/components/stream-client";
+import { LimitReachedError, runStream } from "@/components/stream-client";
+import { LimitCard, UsageHint } from "@/components/usage";
 import type { Progress } from "@/lib/stream-progress";
 import { selectWorkspaces, useHydrated, useResumeStore } from "@/store/resume-store";
 import type { ParseResult } from "@/lib/schemas";
@@ -59,6 +60,7 @@ export default function UploadPage() {
       setParsed(data.resume, data.ats, data.fileName);
       router.push("/ats");
     } catch (e) {
+      if (e instanceof LimitReachedError) return; // the usage card explains when to try again
       setError(e instanceof Error ? e.message : "Upload failed.");
     } finally {
       setProgress(null);
@@ -127,6 +129,7 @@ export default function UploadPage() {
               <Button className="mt-5" onClick={() => inputRef.current?.click()} disabled={!consented}>
                 Choose file
               </Button>
+              <UsageHint route="parse-resume" className="mt-2" />
               <input
                 ref={inputRef}
                 type="file"
@@ -143,6 +146,7 @@ export default function UploadPage() {
         </div>
 
         {error && <div className="mt-4"><ErrorNote>{error}</ErrorNote></div>}
+        <LimitCard route="parse-resume" className="mt-4" />
 
         {/* One instance in a fixed place, so its status message survives the list appearing or disappearing. */}
         {hydrated && !busy && (
