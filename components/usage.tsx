@@ -101,9 +101,51 @@ function computeUsage(l: Log, now: number): Usage {
 
 type Snapshot = { usage: Usage; at: number };
 
+/**
+ * The server's own numbers, when its counts are shared by every instance (Upstash). They're exact and include
+ * requests from this person's other browsers and devices; the local log fills in between refreshes.
+ */
+let server: Snapshot | null = null;
+let serverFetch: Promise<void> | null = null;
+
+export function refreshServerUsage(): Promise<void> {
+  serverFetch ??= fetch("/api/usage", { cache: "no-store" })
+    .then((r) => (r.ok ? (r.json() as Promise<{ shared: boolean; usage: Usage | null }>) : null))
+    .then((data) => {
+      server = data?.shared && data.usage ? { usage: data.usage, at: Date.now() } : null;
+      listeners.forEach((l) => l());
+    })
+    .catch(() => {
+      /* the local count carries on */
+    })
+    .finally(() => {
+      serverFetch = null;
+    });
+  return serverFetch;
+}
+
+/** Per route, whichever source says less is left: the server knows about other devices, the log about the last second. */
+function merge(local: Usage, snap: Snapshot | null, now: number): Usage {
+  if (!snap) return local;
+  const routes = { ...local.routes };
+  for (const route of Object.keys(routes) as UsageRoute[]) {
+    const s = snap.usage.routes[route];
+    const freesAt = s.nextFreeInSec === null ? null : snap.at + s.nextFreeInSec * 1000;
+    // Once the server's next slot has freed up, its number is out of date until the next refresh.
+    if (freesAt !== null && freesAt <= now) continue;
+    if (s.remaining < routes[route].remaining) {
+      routes[route] = { ...s, nextFreeInSec: freesAt === null ? null : Math.ceil((freesAt - now) / 1000) };
+    }
+  }
+  const busyUntil = snap.usage.busy ? snap.at + snap.usage.busy.resetInSec * 1000 : 0;
+  const busy = local.busy ?? (busyUntil > now ? { resetInSec: Math.ceil((busyUntil - now) / 1000) } : null);
+  return { routes, busy };
+}
+
 /** Current usage, re-computed when the log changes and every 15 seconds so "in 8 min" and refills stay current. */
 function useUsage(): { snap: Snapshot | null; now: number } {
   const current = useSyncExternalStore(subscribe, getLog, () => null);
+  const serverSnap = useSyncExternalStore(subscribe, () => server, () => null);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 15_000);
@@ -111,7 +153,23 @@ function useUsage(): { snap: Snapshot | null; now: number } {
   }, []);
   // A request just logged is newer than the last tick: measure from whichever is later.
   const at = Math.max(now, ...Object.values(current?.hits ?? {}).flat());
-  return { snap: current ? { usage: computeUsage(current, at), at } : null, now: at };
+  return { snap: current ? { usage: merge(computeUsage(current, at), serverSnap, at), at } : null, now: at };
+}
+
+/** Keeps the server's numbers fresh: on load, when the tab regains focus, and each minute while anything is used. */
+function useServerRefresh(usage: Usage | undefined) {
+  const partlyUsed = !!usage && (!!usage.busy || Object.values(usage.routes).some((r) => r.remaining < r.limit));
+  useEffect(() => {
+    void refreshServerUsage();
+    const onFocus = () => void refreshServerUsage();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
+  useEffect(() => {
+    if (!partlyUsed) return;
+    const id = setInterval(() => void refreshServerUsage(), 60_000);
+    return () => clearInterval(id);
+  }, [partlyUsed]);
 }
 
 /** Absolute time at which `sec` (measured when the snapshot arrived) runs out. */
@@ -134,6 +192,7 @@ const ORDER: UsageRoute[] = ["match", "parse-jd", "parse-resume"];
 /** 1 · Header chip: matches left (the scarcest action), with a breakdown on click. */
 export function UsageChip() {
   const { snap, now } = useUsage();
+  useServerRefresh(snap?.usage);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 

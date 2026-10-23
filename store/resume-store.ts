@@ -10,6 +10,7 @@ import { hasPlaceholders } from "@/lib/placeholders";
 import { safeStorage } from "./storage";
 import { migrateV1, migrateV2, type V1State } from "./migrations";
 import { jobLabel, type Job, type StartFrom, type State, type Workspace } from "./types";
+import { persistUndoHistory } from "./undo-session";
 
 // Re-exported so the rest of the app can keep importing everything store-related from here.
 export { useSaveFailed } from "./storage";
@@ -365,6 +366,9 @@ export const useResumeStore = create<StoreState>()(
     },
   ),
 );
+
+// Undo history survives reloads in this tab (sessionStorage; see undo-session.ts).
+if (typeof window !== "undefined") persistUndoHistory(useResumeStore);
 
 /** True once persisted state has loaded. False during SSR and the first client render, which avoids hydration mismatches. */
 export function useHydrated() {

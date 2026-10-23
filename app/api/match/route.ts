@@ -13,7 +13,9 @@ import { plainResume } from "@/lib/inline";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-const Body = z.object({ resume: Resume, jd: JobDescription });
+// `recheck`: the job already has a report and the user wants an updated score after editing. Those run at a lower
+// effort to save cost (output, including the model's thinking, is most of a match's price); the first match runs at high.
+const Body = z.object({ resume: Resume, jd: JobDescription, recheck: z.boolean().optional() });
 
 /** Streams progress events, then the match report (see lib/stream-progress.ts). */
 export async function POST(req: Request) {
@@ -29,7 +31,7 @@ export async function POST(req: Request) {
   }
   const parsed = Body.safeParse(body);
   if (!parsed.success) return badRequest("Missing resume or job description.");
-  const { resume, jd } = parsed.data;
+  const { resume, jd, recheck } = parsed.data;
 
   // Hidden sections are excluded from the export, so don't optimise them.
   // The AI works on plain text: formatting markers would only confuse its suggestions.
@@ -43,7 +45,7 @@ export async function POST(req: Request) {
           role: "matching",
           schema: MatchReport,
           system: MATCH_SYSTEM,
-          effort: "high",
+          effort: recheck ? "medium" : "high",
           content: [
             // The job comes first and is cached, so re-checking the score for the same job only pays full price for the
             // (edited) resume.

@@ -65,6 +65,12 @@ test("usage chip shows what's left, with a breakdown", async ({ page }) => {
   await expect(panel).toHaveCount(0);
 });
 
+test("uses the server's numbers when its counts are shared (e.g. matches from another device)", async ({ page }) => {
+  await page.route("**/api/usage", (r) => r.fulfill({ json: { shared: true, usage: usageWith({ match: { remaining: 3, nextFreeInSec: 300 } }) } }));
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: /3 matches left/ })).toBeVisible();
+});
+
 test("warns beside the button when running low", async ({ page }) => {
   await seedUsage(page, { hits: { "parse-resume": [-5, -4, -3, -2, -1] } });
   await page.goto("/");

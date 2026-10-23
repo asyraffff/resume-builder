@@ -89,3 +89,21 @@ test("step navigation and the old /analyze address", async ({ page }) => {
   await page.waitForURL("**/ats");
   await expect(page.getByRole("heading", { name: "ATS check", level: 1 })).toBeVisible();
 });
+
+test("undo still works after reloading the page", async ({ page }) => {
+  await mockAi(page);
+  await uploadSample(page);
+  await page.goto("/editor");
+  await page.getByText("Attended daily standups").click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" every morning");
+  await page.keyboard.press("Escape");
+  await expect(page.getByText("Attended daily standups every morning")).toBeVisible();
+
+  await page.waitForTimeout(600); // history is saved shortly after typing stops
+  await page.reload();
+  const undo = page.getByRole("button", { name: "Undo" });
+  await expect(undo).toBeEnabled();
+  await undo.click();
+  await expect(page.getByText("Attended daily standups", { exact: true })).toBeVisible();
+});

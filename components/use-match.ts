@@ -21,7 +21,7 @@ export function useMatchRunner() {
       const report = await runStream<MatchReport>(
         "match",
         "/api/match",
-        { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ resume: job.resume, jd: job.jd }) },
+        { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ resume: job.resume, jd: job.jd, recheck: !!job.report }) },
         update,
       );
       setReportFor(jobId, report);

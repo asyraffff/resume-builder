@@ -87,6 +87,9 @@ export function getStore(): HitStore {
   }
   return store;
 }
+/** True when counts are shared by every server instance (Redis), so the server's numbers are exact. */
+export const sharedLimits = () => getStore() instanceof RedisStore;
+
 /** Swaps the store (tests); null goes back to choosing from the environment. */
 export function setStore(s: HitStore | null) {
   store = s;

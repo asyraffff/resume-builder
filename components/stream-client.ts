@@ -2,7 +2,7 @@
 
 import { giveConsent, hasConsent } from "@/lib/privacy";
 import { confirmDialog, promptDialog } from "./dialog";
-import { applyServerUsage, recordAiRequest } from "./usage";
+import { applyServerUsage, recordAiRequest, refreshServerUsage } from "./usage";
 import type { UsageRoute } from "@/lib/usage";
 import { applyEvent, startProgress, type Progress, type Stats, type StreamEvent, type Task } from "@/lib/stream-progress";
 
@@ -121,7 +121,10 @@ export async function runStream<D>(task: Task, url: string, init: RequestInit, o
   }
   // The server counts every request that gets past the access code and the limits, even ones it then rejects.
   const route = url.replace(/^\/api\//, "") as UsageRoute;
-  if (res.status !== 401 && res.status !== 429) recordAiRequest(route);
+  if (res.status !== 401 && res.status !== 429) {
+    recordAiRequest(route);
+    void refreshServerUsage(); // the server has counted it by now
+  }
   // Validation errors and rate limits come back as plain JSON before any streaming starts.
   if (!res.ok || !res.body) {
     const data = await res.json().catch(() => ({}));
