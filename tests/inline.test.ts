@@ -42,7 +42,7 @@ describe("inline formatting", () => {
 describe("contact links", () => {
   it.each([
     ["https://www.linkedin.com/in/jane-doe/?trk=public_profile", "linkedin.com/in/jane-doe"],
-    ["http://my.linkedin.com/in/amirulasyraf-/", "linkedin.com/in/amirulasyraf-"],
+    ["http://my.linkedin.com/in/taylor-morgan-/", "linkedin.com/in/taylor-morgan-"],
     ["linkedin.com/in/jane", "linkedin.com/in/jane"],
     ["https://github.com/jane/", "github.com/jane"],
     ["jane@example.com", "jane@example.com"],

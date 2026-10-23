@@ -1,5 +1,12 @@
+# Store text files with LF line endings in the repository, whatever the editor on Windows writes.
 * text=auto eol=lf
+
+# Binary files: never touch.
 *.png binary
+*.jpg binary
 *.ico binary
+*.ttf binary
+*.woff binary
+*.woff2 binary
 *.pdf binary
 *.docx binary
