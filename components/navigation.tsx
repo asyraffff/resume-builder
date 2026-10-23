@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useHydrated, useResumeStore, useSaveFailed } from "@/store/resume-store";
+import { selectWorkspaces, useHydrated, useResumeStore, useSaveFailed } from "@/store/resume-store";
+import { SAMPLE_FILE_NAME } from "@/lib/sample";
 import { Button, LinkButton } from "./ui";
 import { UsageChip } from "./usage";
 
@@ -22,6 +23,7 @@ export function Header({ step, right }: { step: Step; right?: ReactNode }) {
   const enabled = (i: number) => i === 0 || (hydrated && hasResume);
 
   const saveFailed = useSaveFailed();
+  const onSample = useResumeStore((s) => hydrated && selectWorkspaces(s).find((w) => w.id === s.activeWorkspaceId)?.fileName === SAMPLE_FILE_NAME);
   return (
     <header className="sticky top-0 z-20 border-b border-border bg-surface/90 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-7xl items-center gap-3 px-4 sm:gap-5">
@@ -59,6 +61,15 @@ export function Header({ step, right }: { step: Step; right?: ReactNode }) {
           {right}
         </div>
       </div>
+      {onSample && (
+        <div className="border-t border-border bg-accent-soft/60 px-4 py-2 text-center text-sm">
+          You&apos;re exploring a sample resume (Alex Rivera is made up). Accepting suggestions, editing and exporting are free;
+          adding a job or re-checking the match uses AI.{" "}
+          <Link href="/" className="font-medium text-accent hover:underline">
+            Upload your own
+          </Link>
+        </div>
+      )}
       {saveFailed && (
         <div role="alert" className="border-t border-red-200 bg-red-50 px-4 py-2 text-center text-sm text-bad">
           Your latest changes couldn&apos;t be saved because this browser&apos;s storage is full. Back up your resumes from the Upload page,

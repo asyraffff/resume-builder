@@ -15,6 +15,7 @@ import { LimitCard, UsageHint } from "@/components/usage";
 import type { Progress } from "@/lib/stream-progress";
 import { selectWorkspaces, useHydrated, useResumeStore } from "@/store/resume-store";
 import type { ParseResult } from "@/lib/schemas";
+import { SAMPLE_FILE_NAME, sampleAts, sampleJob, sampleReport, sampleResume } from "@/lib/sample";
 
 const noSubscribe = () => () => {};
 
@@ -34,7 +35,7 @@ export default function UploadPage() {
   const [justAgreed, setJustAgreed] = useState(false);
   const consented = storedConsent || justAgreed;
   const state = useResumeStore();
-  const { setParsed, resume, activeWorkspaceId, switchWorkspace, deleteWorkspace } = state;
+  const { setParsed, resume, activeWorkspaceId, switchWorkspace, deleteWorkspace, addJob, setReportFor } = state;
   const workspaces = selectWorkspaces(state);
   const sorted = [...workspaces].sort((a, b) => b.updatedAt - a.updatedAt);
 
@@ -65,6 +66,19 @@ export default function UploadPage() {
     } finally {
       setProgress(null);
     }
+  }
+
+  /** Loads the built-in sample (no upload, no AI) so people can see every step first. Reuses it if already loaded. */
+  function trySample() {
+    const existing = workspaces.find((w) => w.fileName === SAMPLE_FILE_NAME);
+    if (existing) {
+      switchWorkspace(existing.id);
+    } else {
+      setParsed(structuredClone(sampleResume), structuredClone(sampleAts), SAMPLE_FILE_NAME);
+      const jobId = addJob(structuredClone(sampleJob), "original");
+      setReportFor(jobId, structuredClone(sampleReport));
+    }
+    router.push("/ats");
   }
 
   return (
@@ -130,6 +144,11 @@ export default function UploadPage() {
                 Choose file
               </Button>
               <UsageHint route="parse-resume" className="mt-2" />
+              {!sorted.some((w) => w.fileName === SAMPLE_FILE_NAME) && (
+                <button type="button" onClick={trySample} className="mt-3 text-sm text-accent hover:underline">
+                  No resume to hand? Try a sample
+                </button>
+              )}
               <input
                 ref={inputRef}
                 type="file"

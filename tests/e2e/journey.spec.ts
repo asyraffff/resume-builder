@@ -107,3 +107,18 @@ test("undo still works after reloading the page", async ({ page }) => {
   await undo.click();
   await expect(page.getByText("Attended daily standups", { exact: true })).toBeVisible();
 });
+
+test("trying the sample shows every step without uploading or calling the AI", async ({ page }) => {
+  const calls = await mockAi(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "No resume to hand? Try a sample" }).click();
+  await page.waitForURL("**/ats");
+  await expect(page.getByText("You're exploring a sample resume")).toBeVisible();
+  await expect(page.getByText("Non-standard section headings").first()).toBeVisible();
+
+  await page.goto("/editor");
+  await expect(page.getByText("Suggestions (5 to review)")).toBeVisible();
+  await page.getByRole("button", { name: /Accept all safe/ }).click();
+  await expect(page.getByText("Built Python ETL scripts that merged shipment data")).toBeVisible();
+  expect(calls).toEqual({ parseResume: 0, parseJd: 0, match: 0 });
+});
