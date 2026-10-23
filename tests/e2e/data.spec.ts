@@ -50,9 +50,10 @@ test("usage chip shows what's left, with a breakdown", async ({ page }) => {
   const chip = page.getByRole("button", { name: /6 matches left/ });
   await chip.click();
   const panel = page.getByRole("dialog", { name: "Your AI usage" });
-  await expect(panel).toContainText("6 of 8 left");
-  await expect(panel).toContainText("15 of 15 left");
-  await expect(panel).toContainText("Next one frees up in 8 min");
+  await expect(panel).toContainText("6 left");
+  await expect(panel).toContainText("2 of 8 used · next frees up in 8 min");
+  await expect(panel).toContainText("None used · 15 per 10 minutes");
+  await expect(panel.getByRole("meter", { name: "matches used" })).toHaveAttribute("aria-valuenow", "2");
   await page.keyboard.press("Escape");
   await expect(panel).toHaveCount(0);
 });

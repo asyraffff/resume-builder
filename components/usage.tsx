@@ -135,22 +135,34 @@ export function UsageChip() {
             <ul className="mt-3 space-y-3">
               {ORDER.map((route) => {
                 const r = routes[route];
-                const pct = Math.round((r.remaining / r.limit) * 100);
-                const bar = r.remaining === 0 ? "bg-bad" : isLow(r.remaining, r.limit) ? "bg-warn" : "bg-accent";
+                const used = r.limit - r.remaining;
+                // The bar shows what's been used, so a fresh allowance is an empty track (not a "full" bar that
+                // reads as maxed out). It turns amber when running low and red when nothing is left.
+                const pct = Math.round((used / r.limit) * 100);
+                const fill = r.remaining === 0 ? "bg-bad" : isLow(r.remaining, r.limit) ? "bg-warn" : "bg-muted/60";
                 return (
                   <li key={route}>
-                    <div className="flex justify-between gap-3">
+                    <div className="flex items-baseline justify-between gap-3">
                       <span className="first-letter:uppercase">{USAGE_LABELS[route].many}</span>
-                      <span className="tabular-nums text-muted">
-                        {r.remaining} of {r.limit} left
+                      <span className={`tabular-nums ${r.remaining === 0 ? "text-bad" : isLow(r.remaining, r.limit) ? "text-warn" : "text-foreground"}`}>
+                        <span className="font-medium">{r.remaining}</span> left
                       </span>
                     </div>
-                    <div className="mt-1 h-1.5 rounded-full bg-background" aria-hidden>
-                      <div className={`h-1.5 rounded-full ${bar}`} style={{ width: `${pct}%` }} />
+                    <div
+                      className="mt-1.5 h-1.5 rounded-full bg-border"
+                      role="meter"
+                      aria-label={`${USAGE_LABELS[route].many} used`}
+                      aria-valuemin={0}
+                      aria-valuemax={r.limit}
+                      aria-valuenow={used}
+                    >
+                      {used > 0 && <div className={`h-1.5 rounded-full ${fill}`} style={{ width: `${Math.max(pct, 4)}%` }} />}
                     </div>
-                    {r.remaining < r.limit && r.nextFreeInSec !== null && (
-                      <p className="mt-1 text-xs text-muted">Next one frees up in {relative(atTime(snap, r.nextFreeInSec) - now)}</p>
-                    )}
+                    <p className="mt-1 text-xs text-muted">
+                      {used === 0
+                        ? `None used · ${r.limit} per ${r.window === "day" ? "day" : "10 minutes"}`
+                        : `${used} of ${r.limit} used${r.nextFreeInSec !== null ? ` · next frees up in ${relative(atTime(snap, r.nextFreeInSec) - now)}` : ""}`}
+                    </p>
                   </li>
                 );
               })}
