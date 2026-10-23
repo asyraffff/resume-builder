@@ -2,7 +2,8 @@
 
 import { giveConsent, hasConsent } from "@/lib/privacy";
 import { confirmDialog, promptDialog } from "./dialog";
-import { refreshUsage, setUsage } from "./usage";
+import { applyServerUsage, recordAiRequest } from "./usage";
+import type { UsageRoute } from "@/lib/usage";
 import { applyEvent, startProgress, type Progress, type Stats, type StreamEvent, type Task } from "@/lib/stream-progress";
 
 const statsKey = (task: Task) => `resume-tailor-${task}-stats`;
@@ -118,27 +119,26 @@ export async function runStream<D>(task: Task, url: string, init: RequestInit, o
     if (!data.needsAccessCode || !(await askForAccessCode(attempt > 0 || !!readAccessCode()))) break;
     res = await fetch(url, { method: "POST", ...withAccessCode(init) });
   }
+  // The server counts every request that gets past the access code and the limits, even ones it then rejects.
+  const route = url.replace(/^\/api\//, "") as UsageRoute;
+  if (res.status !== 401 && res.status !== 429) recordAiRequest(route);
   // Validation errors and rate limits come back as plain JSON before any streaming starts.
   if (!res.ok || !res.body) {
     const data = await res.json().catch(() => ({}));
     if (res.status === 429 && data.limitReached) {
-      if (data.usage) setUsage(data.usage);
+      if (data.usage) applyServerUsage(route, data.usage);
       throw new LimitReachedError(data.error ?? "Limit reached.", data);
     }
     throw new StreamRequestError(data.error ?? "Request failed.", data);
   }
-  try {
-    for await (const e of readEvents<D>(res)) {
-      if (e.type === "error") throw new Error(e.message);
-      if (e.type === "done") {
-        recordStats(task, Date.now() - started, current.chars);
-        return e.data;
-      }
-      current = applyEvent(current, e, Date.now());
-      onProgress(current);
+  for await (const e of readEvents<D>(res)) {
+    if (e.type === "error") throw new Error(e.message);
+    if (e.type === "done") {
+      recordStats(task, Date.now() - started, current.chars);
+      return e.data;
     }
-    throw new Error("The connection closed before it finished. Please retry.");
-  } finally {
-    void refreshUsage(); // this request counted, so update the usage meter
+    current = applyEvent(current, e, Date.now());
+    onProgress(current);
   }
+  throw new Error("The connection closed before it finished. Please retry.");
 }

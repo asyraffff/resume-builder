@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
-import { mockAi, uploadSample, usageWith } from "./fixtures";
+import { mockAi, seedUsage, uploadSample, usageWith } from "./fixtures";
 
 test("back up, delete all data, then restore from the backup", async ({ page }) => {
   await mockAi(page);
@@ -35,7 +35,6 @@ test("a reached limit shows when to come back instead of an error", async ({ pag
       body: JSON.stringify({ error: "You've reached the limit for uploads.", limitReached: true, usage }),
     }),
   );
-  await page.route("**/api/usage", (r) => r.fulfill({ json: usage }));
   await page.goto("/");
   await page.getByText("I understand my resume will be sent").click();
   await page.locator('input[type="file"][accept*="pdf"]').setInputFiles({ name: "cv.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4") });
@@ -44,11 +43,19 @@ test("a reached limit shows when to come back instead of an error", async ({ pag
   await expect(page.getByRole("alert").filter({ hasText: "limit" })).toHaveCount(0);
 });
 
+test("the usage meter counts requests as they happen", async ({ page }) => {
+  await mockAi(page);
+  await uploadSample(page);
+  await page.getByRole("button", { name: /8 matches left/ }).click();
+  const panel = page.getByRole("dialog", { name: "Your AI usage" });
+  await expect(panel).toContainText("1 of 6 used");
+  await expect(panel).toContainText("None used · 8 per 10 minutes");
+});
+
 test("usage chip shows what's left, with a breakdown", async ({ page }) => {
-  await page.route("**/api/usage", (r) => r.fulfill({ json: usageWith({ match: { remaining: 6, nextFreeInSec: 480 } }) }));
+  await seedUsage(page, { hits: { match: [-2, -1] } });
   await page.goto("/");
-  const chip = page.getByRole("button", { name: /6 matches left/ });
-  await chip.click();
+  await page.getByRole("button", { name: /6 matches left/ }).click();
   const panel = page.getByRole("dialog", { name: "Your AI usage" });
   await expect(panel).toContainText("6 left");
   await expect(panel).toContainText("2 of 8 used · next frees up in 8 min");
@@ -58,16 +65,27 @@ test("usage chip shows what's left, with a breakdown", async ({ page }) => {
   await expect(panel).toHaveCount(0);
 });
 
-test("warns beside the button when running low, and says when the app is paused", async ({ page }) => {
-  let usage = usageWith({ "parse-resume": { remaining: 1, nextFreeInSec: 300 } });
-  await page.route("**/api/usage", (r) => r.fulfill({ json: usage }));
+test("warns beside the button when running low", async ({ page }) => {
+  await seedUsage(page, { hits: { "parse-resume": [-5, -4, -3, -2, -1] } });
   await page.goto("/");
   await expect(page.getByText("1 upload left, more in 5 min")).toBeVisible();
+});
 
-  usage = { ...usageWith({}), busy: { resetInSec: 7200 } };
-  await page.reload();
+test("says when the whole app is paused", async ({ page }) => {
+  await seedUsage(page, { busyInMin: 120 });
+  await page.goto("/");
   await expect(page.getByRole("button", { name: /AI paused/ })).toBeVisible();
   await expect(page.getByText("AI features are paused for today")).toBeVisible();
+});
+
+test("the usage chip doesn't overlap the steps on a narrower screen", async ({ page }) => {
+  await page.setViewportSize({ width: 1080, height: 800 });
+  await mockAi(page);
+  await uploadSample(page);
+  await page.goto("/editor");
+  const step = await page.locator('header [aria-current="step"]').boundingBox();
+  const chip = await page.getByRole("button", { name: /matches left/ }).boundingBox();
+  expect(step!.x + step!.width).toBeLessThanOrEqual(chip!.x);
 });
 
 test("privacy page is linked from every page, and security headers are sent", async ({ page }) => {

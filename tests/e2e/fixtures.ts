@@ -147,3 +147,13 @@ export function usageWith(changes: Record<string, Partial<RouteUsage>>) {
   const routes = Object.fromEntries(Object.entries(fullUsage).map(([k, v]) => [k, { ...v, ...changes[k] }]));
   return { routes, busy: null as { resetInSec: number } | null };
 }
+
+/** Seeds this browser's AI request log. `hits` are minutes ago (negative numbers) per route. */
+export async function seedUsage(page: Page, opts: { hits?: Record<string, number[]>; busyInMin?: number }) {
+  await page.addInitScript((o) => {
+    const now = Date.now();
+    const hits = Object.fromEntries(Object.entries(o.hits ?? {}).map(([r, mins]) => [r, mins.map((m) => now + m * 60_000)]));
+    const busyUntil = o.busyInMin ? now + o.busyInMin * 60_000 : null;
+    localStorage.setItem("resume-tailor-ai-usage", JSON.stringify({ hits, blockedUntil: {}, busyUntil }));
+  }, opts);
+}

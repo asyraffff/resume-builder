@@ -1,24 +1,18 @@
 /**
  * In-memory sliding-window rate limiting. Each server instance counts on its own, so on serverless hosting (Vercel)
  * limits are per instance: good against casual abuse, not a hard guarantee. To make them global, replace `store`
- * with a shared one (e.g. Upstash Redis) that implements the same `hit` method.
+ * with a shared one (e.g. Upstash Redis) that implements the same methods.
  */
 
-import type { RouteUsage, Usage } from "./usage";
+import { DAY, USAGE_LABELS, USAGE_LIMITS, routeUsage, type Usage, type UsageRoute, type Window } from "./usage";
 
-export type Window = { limit: number; windowMs: number };
-export type Rule = { name: string; windows: Window[] };
+export type { Window };
+export type RouteName = UsageRoute;
 
-const MIN = 60_000;
-const DAY = 24 * 60 * MIN;
-
-/** Per-visitor limits for each AI-backed route. Generous for real use, tight enough to stop scripted abuse. */
-export const RULES = {
-  "parse-resume": { name: "uploads", windows: [{ limit: 6, windowMs: 10 * MIN }, { limit: 30, windowMs: DAY }] },
-  "parse-jd": { name: "job descriptions", windows: [{ limit: 15, windowMs: 10 * MIN }, { limit: 80, windowMs: DAY }] },
-  match: { name: "matches", windows: [{ limit: 8, windowMs: 10 * MIN }, { limit: 50, windowMs: DAY }] },
-} satisfies Record<string, Rule>;
-export type RouteName = keyof typeof RULES;
+/** Per-visitor limits for each AI-backed route (defined in lib/usage.ts so the browser's usage meter matches). */
+export const RULES = Object.fromEntries(
+  (Object.keys(USAGE_LIMITS) as RouteName[]).map((r) => [r, { name: USAGE_LABELS[r].many, windows: USAGE_LIMITS[r] }]),
+) as Record<RouteName, { name: string; windows: Window[] }>;
 
 /** Backstop on total AI calls per server instance per day, whoever makes them (override with AI_DAILY_LIMIT). */
 export const globalDailyLimit = () => Number(process.env.AI_DAILY_LIMIT) || 1000;
@@ -56,6 +50,11 @@ class MemoryStore {
     });
   }
 
+  /** Times of the recorded hits for `key`. */
+  times(key: string): number[] {
+    return this.hits.get(key) ?? [];
+  }
+
   reset() {
     this.hits.clear();
   }
@@ -75,35 +74,15 @@ export function checkRateLimit(route: RouteName, visitor: string, now = Date.now
   return { ok: true };
 }
 
-/** What `visitor` may still do on each route, for the usage meter. Doesn't count as a request. */
+/** What `visitor` may still do on each route, sent with limit responses. Doesn't count as a request. */
 export function usageFor(visitor: string, now = Date.now()): Usage {
   const [global] = store.peek("global", globalWindows(), now);
   const globalLeft = Math.max(0, globalDailyLimit() - global.used);
-  const secs = (ms: number | null) => (ms === null ? null : Math.ceil(ms / 1000));
-
   const routes = Object.fromEntries(
-    (Object.keys(RULES) as RouteName[]).map((route) => {
-      const windows = RULES[route].windows;
-      const stats = store.peek(`${route}:${visitor}`, windows, now);
-      // The tightest window decides; on a tie the shorter one, since it refills sooner.
-      let i = 0;
-      stats.forEach((s, k) => {
-        if (windows[k].limit - s.used < windows[i].limit - stats[i].used) i = k;
-      });
-      const own = windows[i].limit - stats[i].used;
-      const cappedByGlobal = globalLeft < own;
-      const usage: RouteUsage = {
-        remaining: Math.max(0, Math.min(own, globalLeft)),
-        limit: windows[i].limit,
-        window: windows[i].windowMs === DAY ? "day" : "10 minutes",
-        daily: windows.find((w) => w.windowMs === DAY)?.limit ?? windows[i].limit,
-        nextFreeInSec: secs(cappedByGlobal ? global.freesInMs : stats[i].freesInMs),
-      };
-      return [route, usage];
-    }),
+    (Object.keys(RULES) as RouteName[]).map((route) => [route, routeUsage(route, store.times(`${route}:${visitor}`), now, globalLeft)]),
   ) as Usage["routes"];
-
-  return { routes, busy: globalLeft === 0 ? { resetInSec: secs(global.freesInMs) ?? 0 } : null };
+  const resetInSec = Math.ceil((global.freesInMs ?? 0) / 1000);
+  return { routes, busy: globalLeft === 0 ? { resetInSec } : null };
 }
 
 /** The visitor's IP as reported by the hosting platform (Vercel sets x-forwarded-for; the first entry is the client). */
