@@ -19,6 +19,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@react-pdf/renderer": "^4.9.0",
+    "@upstash/redis": "^1.39.0",
     "@vercel/speed-insights": "^2.0.0",
     "cheerio": "^1.2.0",
     "docx": "^9.13.0",

@@ -20,7 +20,7 @@ export const maxDuration = 120;
  * are answered with plain JSON before streaming starts; then progress events stream, followed by the result.
  */
 export async function POST(req: Request) {
-  const blocked = guardRequest(req, "parse-jd");
+  const blocked = await guardRequest(req, "parse-jd");
   if (blocked) return blocked;
   let content: Anthropic.Beta.Messages.BetaContentBlockParam[];
   let rawText = "";

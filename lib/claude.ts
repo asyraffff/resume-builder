@@ -85,12 +85,11 @@ function toAiError(err: unknown): unknown {
 }
 
 function checkResult<T>(response: Anthropic.Beta.Messages.BetaMessage & { parsed_output?: T | null }, maxTokens: number): T {
-  if (process.env.NODE_ENV !== "production") {
-    const u = response.usage;
-    console.info(
-      `Claude usage (${response.model}): ${u.input_tokens} in + ${u.cache_read_input_tokens ?? 0} cache read + ${u.cache_creation_input_tokens ?? 0} cache write / ${u.output_tokens} out (max ${maxTokens})`,
-    );
-  }
+  // Token counts only (never content), so costs can be followed in the hosting logs.
+  const u = response.usage;
+  console.info(
+    `Claude usage (${response.model}): ${u.input_tokens} in + ${u.cache_read_input_tokens ?? 0} cache read + ${u.cache_creation_input_tokens ?? 0} cache write / ${u.output_tokens} out (max ${maxTokens})`,
+  );
   if (response.stop_reason === "refusal") {
     throw new AiError("The AI declined to process this content. Try different input.", 422);
   }

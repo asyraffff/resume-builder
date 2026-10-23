@@ -66,8 +66,9 @@ export default function PrivacyPage() {
             <strong>No resume or job content.</strong> Error logs record the type of error only, never what you sent.
           </li>
           <li>
-            <strong>Your IP address, briefly, in memory,</strong> to limit how many requests one visitor can make (to prevent abuse and
-            control costs). It isn&apos;t written to disk and is forgotten within a day.
+            <strong>Your IP address and the times of your AI requests,</strong> to limit how many requests one visitor can make (to
+            prevent abuse and control costs). They&apos;re kept in our rate-limit store (Upstash) and deleted automatically within a
+            day of your last request.
           </li>
           <li>Our hosting provider may keep standard request logs (such as time, page and IP address) under its own policies.</li>
           <li>

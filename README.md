@@ -21,6 +21,8 @@ npm run dev                  # http://localhost:3000
 | `npm run lint` | ESLint |
 | `npm run build` | Production build |
 
+GitHub Actions (`.github/workflows/ci.yml`) runs lint, the type check, unit tests and end-to-end tests on every push and pull request.
+
 ## How it works
 
 Everything revolves around one structured `Resume` JSON (`lib/schemas.ts`):
@@ -51,7 +53,9 @@ Things to know:
 
 - **Function duration.** Matching can take a few minutes, so `/api/match` sets `maxDuration = 300` and the reading routes set 120. This needs Fluid compute, which is on by default for new projects.
 - **Upload size.** Vercel caps request bodies at 4.5 MB. The app caps uploads at 4.4 MB, resumes at 4 MB, and shrinks large screenshots in the browser before sending them.
-- **Rate limits** (`lib/rate-limit.ts`) are held in memory, per server instance. They stop casual abuse and runaway loops but reset when an instance restarts, and each instance counts separately. The Anthropic spend limit is the real backstop. Moving the counters to a shared store (Upstash Redis, for example) only means replacing `MemoryStore`. The visitor is identified by `x-forwarded-for`, which Vercel sets to the real client IP. Behind another proxy, check that it does the same.
+- **Rate limits** (`lib/rate-limit.ts`, limits defined in `lib/usage.ts`). Connect **Upstash for Redis** from Vercel's Marketplace (Storage → Upstash → connect to this project; the free tier is plenty) and redeploy: it adds `KV_REST_API_URL` and `KV_REST_API_TOKEN`, and every server instance then shares one set of counts, so per-visitor limits and `AI_DAILY_LIMIT` are exact. Without it, counts are kept in each instance's memory, and on Vercel each instance (and each API route) counts separately. If Redis is unreachable, requests are let through and the error is logged; the Anthropic spend limit is the backstop. Visitors are identified by `x-forwarded-for`, which Vercel sets to the real client IP.
+- **Usage meter.** The header chip, low-allowance hints and "try again at…" card (`components/usage.tsx`) count requests in the browser with the same limits, and switch to the server's numbers when it refuses a request.
+- **Logs.** Each AI call logs its token counts, limit hits log a warning, and unexpected errors log the error type. Resume and job content is never logged.
 - **Access code.** Setting `APP_ACCESS_CODE` turns the site into a private beta: visitors are asked for the code once and it's remembered in their browser.
 - **Security headers** (no framing, no MIME sniffing, a strict referrer policy) are set in `next.config.ts`.
 
@@ -66,4 +70,4 @@ Things to know:
 
 ## Not in the MVP yet
 
-Accounts and a database (sync across devices), cover letters, error monitoring, and shared rate-limit storage.
+Accounts and a database (sync across devices), cover letters, and the rest of the roadmap.

@@ -17,7 +17,7 @@ export const maxDuration = 120;
 
 /** Validates the upload, then streams progress events and finally the parsed resume and ATS report. */
 export async function POST(req: Request) {
-  const blocked = guardRequest(req, "parse-resume");
+  const blocked = await guardRequest(req, "parse-resume");
   if (blocked) return blocked;
   let content: Anthropic.Beta.Messages.BetaContentBlockParam[];
   let rawText: string | undefined;

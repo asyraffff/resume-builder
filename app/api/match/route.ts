@@ -17,7 +17,7 @@ const Body = z.object({ resume: Resume, jd: JobDescription });
 
 /** Streams progress events, then the match report (see lib/stream-progress.ts). */
 export async function POST(req: Request) {
-  const blocked = guardRequest(req, "match");
+  const blocked = await guardRequest(req, "match");
   if (blocked) return blocked;
   // A resume plus job description is a few hundred KB at most.
   let body: unknown;

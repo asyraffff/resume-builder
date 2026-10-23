@@ -19,20 +19,22 @@ function codeMatches(given: string): boolean {
  * Runs before any AI-backed route does work: checks the optional access code, then the rate limits.
  * Returns a response to send back when the request must stop, or null to continue.
  */
-export function guardRequest(req: Request, route: RouteName): Response | null {
+export async function guardRequest(req: Request, route: RouteName): Promise<Response | null> {
   if (accessCodeRequired() && !codeMatches(req.headers.get(ACCESS_HEADER) ?? "")) {
     return NextResponse.json({ error: "This app needs an access code.", needsAccessCode: true }, { status: 401 });
   }
   const visitor = visitorId(req);
-  const decision = checkRateLimit(route, visitor);
+  const decision = await checkRateLimit(route, visitor);
   if (!decision.ok) {
     const error =
       decision.reason === "global"
         ? "The app has reached its daily usage limit. Please try again later."
         : `You've reached the limit for ${RULES[route].name}. Please try again in ${retryText(decision.retryAfterSec)}.`;
+    // Shows up in the hosting logs (no IP or content), so you can see when limits are being hit.
+    console.warn(`Rate limit reached: ${route} (${decision.reason}), retry in ${decision.retryAfterSec}s`);
     // The usage snapshot lets the page show when the visitor can try again, instead of a plain error.
     return NextResponse.json(
-      { error, limitReached: true, usage: usageFor(visitor) },
+      { error, limitReached: true, usage: await usageFor(visitor) },
       { status: 429, headers: { "Retry-After": String(decision.retryAfterSec) } },
     );
   }
